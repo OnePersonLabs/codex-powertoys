@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { ConfigMutationResult, ConfigOverride, Diagnostic, McpRecord, Scope, SourceRange } from "./types.js";
+import type { ConfigMutationResult, ConfigOverride, Diagnostic, McpRecord, PluginOverride, Scope, SourceRange } from "./types.js";
 
 export interface TomlSection {
   header: string;
@@ -64,6 +64,30 @@ export function parseSkillOverrides(text: string, path: string, scope: Scope): C
     path: String(section.values.path), enabled: typeof section.values.enabled === "boolean" ? section.values.enabled : undefined,
     scope, range: { path, startLine: section.startLine, endLine: section.endLine }
   }));
+}
+
+export function parsePluginOverrides(text: string, path: string, scope: Scope): PluginOverride[] {
+  return parseSections(text).filter((section) => section.path[0] === "plugins" && section.path.length === 2).map((section) => {
+    const key = section.path[1] ?? ""; const [name, source] = key.split(/@(.+)/, 2);
+    return { key, name: name || key, source, enabled: typeof section.values.enabled === "boolean" ? section.values.enabled : undefined, scope, configPath: path, range: { path, startLine: section.startLine, endLine: section.endLine } };
+  });
+}
+
+export async function setPluginOverride(configPath: string, key: string, enabled: boolean | undefined): Promise<ConfigMutationResult> {
+  const original = await readConfig(configPath); const lines = linesOf(original); const sections = parseSections(original); const section = sections.find((candidate) => candidate.path[0] === "plugins" && candidate.path[1] === key);
+  if (!section) {
+    if (enabled === undefined) return { path: configPath, changed: false };
+    const separator = original && !original.endsWith("\n") ? "\n\n" : original ? "\n" : ""; await writeConfig(configPath, `${original}${separator}[plugins.${JSON.stringify(key)}]\nenabled = ${enabled}\n`); return { path: configPath, changed: true };
+  }
+  const block = lines.slice(section.startLine, section.endLine + 1);
+  const enabledIndex = block.findIndex((line) => /^\s*enabled\s*=/.test(line));
+  if (enabled === undefined) {
+    if (enabledIndex >= 0) block.splice(enabledIndex, 1);
+    const meaningful = block.slice(1).some((line) => line.trim() && !line.trim().startsWith("#"));
+    if (!meaningful) block.splice(0, block.length);
+  } else if (enabledIndex >= 0) block[enabledIndex] = `enabled = ${enabled}`;
+  else block.splice(1, 0, `enabled = ${enabled}`);
+  lines.splice(section.startLine, section.endLine - section.startLine + 1, ...block); const nextText = lines.join("\n"); if (nextText === original) return { path: configPath, changed: false }; await writeConfig(configPath, nextText); return { path: configPath, changed: true };
 }
 
 export function parseMcpSections(text: string, configPath: string, scope: Scope): McpRecord[] {

@@ -51,6 +51,7 @@ export async function resolveRoots(options: DiscoveryOptions = {}): Promise<Root
   add(join(home, ".agents", "skills"), "global", "user");
   add(join(codexHome, "skills"), "global", "system");
   for (const path of await findSkillRoots(join(codexHome, "plugins"))) add(path, "global", "plugin");
+  if (workspaceRoot) for (const path of await findSkillRoots(join(workspaceRoot, ".codex", "plugins"))) add(path, "workspace", "plugin");
   for (const path of [...await configReferencedSkillPaths(globalConfigPath), ...(workspaceConfigPath ? await configReferencedSkillPaths(workspaceConfigPath) : [])]) {
     add(path, workspaceRoot && resolve(path).startsWith(workspaceRoot) ? "workspace" : "global", "config");
   }

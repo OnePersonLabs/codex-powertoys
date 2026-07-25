@@ -1,4 +1,4 @@
 interface:
-  display_name: "OpenSpec Reconcile Specs"
+  display_name: "OPSXX Reconcile Specs"
   short_description: "Reconcile implementation drift back into OpenSpec specs"
   default_prompt: "Use $opsxx-reconcile-specs to compare implementation reality with OpenSpec specs."

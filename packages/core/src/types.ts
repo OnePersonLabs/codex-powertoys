@@ -2,6 +2,10 @@ import type { ChildProcess } from "node:child_process";
 
 export type Scope = "global" | "workspace";
 export type SourceKind = "workspace" | "user" | "plugin" | "system" | "config" | "unknown";
+export type ResourceKind = "skill" | "mcp" | "agent";
+export type EffectiveResourceState = "active" | "disabled" | "shadowed" | "unavailable";
+export type ConflictMode = "skip" | "replace" | "decide-each";
+export type TransferOperation = "copy" | "move";
 
 export interface Diagnostic {
   code: string;
@@ -24,8 +28,23 @@ export interface PluginInfo {
   name: string;
   version?: string;
   root: string;
+  scope?: Scope;
+  source?: string;
   enabled: boolean;
+  configPath?: string;
+  configKey?: string;
+  manifestPath?: string;
+  mcpPath?: string;
+  readOnly?: boolean;
   metadata?: Record<string, unknown>;
+}
+
+export interface PluginRecord extends PluginInfo {
+  id: string;
+  diagnostics: Diagnostic[];
+  sourceRange?: SourceRange;
+  skillPaths: string[];
+  mcpNames: string[];
 }
 
 export interface SupportingEntry {
@@ -48,8 +67,9 @@ export interface SkillState {
   global: "default" | "enabled" | "disabled";
   workspace: "default" | "enabled" | "disabled";
   pluginEnabled: boolean;
-  effective: "active" | "disabled" | "shadowed" | "unavailable";
+  effective: EffectiveResourceState;
   shadowedBy?: string;
+  disabledByPlugin?: boolean;
   glyph: "✅" | "☑️" | "❌" | "✖️";
 }
 
@@ -74,6 +94,10 @@ export interface AgentRecord {
   name: string;
   path: string;
   scope: Scope;
+  rootPath: string;
+  relativePath: string;
+  sourceKind: SourceKind;
+  readOnly?: boolean;
   content: string;
   diagnostics: Diagnostic[];
 }
@@ -103,13 +127,31 @@ export interface ConfigOverride {
   range: SourceRange;
 }
 
+export interface PluginOverride {
+  key: string;
+  name: string;
+  source?: string;
+  enabled?: boolean;
+  scope: Scope;
+  configPath: string;
+  range: SourceRange;
+}
+
 export interface McpRecord {
   id: string;
   name: string;
   scope: Scope;
+  sourceKind: SourceKind;
+  plugin?: PluginInfo;
   configPath: string;
   config: Record<string, unknown>;
   enabled: boolean;
+  pluginEnabled: boolean;
+  effective: EffectiveResourceState;
+  shadowedBy?: string;
+  disabledByPlugin?: boolean;
+  workingDirectory?: string;
+  readOnly?: boolean;
   explicitEnabled?: boolean;
   sourceRange: SourceRange;
   diagnostics: Diagnostic[];
@@ -140,6 +182,40 @@ export interface McpToolOptions {
 export interface ConfigMutationResult {
   path: string;
   changed: boolean;
+  diagnostics?: Diagnostic[];
+}
+
+export interface ResourceIdentity {
+  kind: ResourceKind;
+  id: string;
+  name: string;
+  scope: Scope;
+  path: string;
+  relativePath?: string;
+  sourceKind: SourceKind;
+  readOnly?: boolean;
+  plugin?: PluginInfo;
+}
+
+export interface TransferRequest {
+  resources: ResourceIdentity[];
+  operation: TransferOperation;
+  targetScope: Scope;
+  targetPath?: string;
+  conflictMode: ConflictMode;
+}
+
+export interface TransferItemResult {
+  resource: ResourceIdentity;
+  changed: boolean;
+  skipped?: boolean;
+  destination?: string;
+  error?: Diagnostic;
+}
+
+export interface TransferResult {
+  items: TransferItemResult[];
+  diagnostics: Diagnostic[];
 }
 
 export type FileReader = (path: string) => Promise<string>;
