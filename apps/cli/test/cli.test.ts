@@ -13,7 +13,7 @@ test("roots command emits JSON", async () => {
 });
 
 test("status and MCP show return stable JSON with source locations", async () => {
-  const root = await mkdtemp(resolve(tmpdir(), "codex-inspector-cli-")); const home = resolve(root, "home"); const codex = resolve(home, ".codex"); const workspace = resolve(root, "workspace");
+  const root = await mkdtemp(resolve(tmpdir(), "codex-powertoys-cli-")); const home = resolve(root, "home"); const codex = resolve(home, ".codex"); const workspace = resolve(root, "workspace");
   await mkdir(codex, { recursive: true }); await mkdir(workspace, { recursive: true });
   await writeFile(resolve(codex, "config.toml"), "[mcp_servers.demo]\ncommand = \"echo\"\n");
   const args = ["--codex-home", codex, "--workspace", workspace];

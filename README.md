@@ -1,12 +1,12 @@
-# Codex Inspector
+# Codex PowerToys
 
-Codex Inspector is a TypeScript monorepo for exploring Codex skills, plugin origins, subagent TOML files, and MCP configuration.
+Codex PowerToys is a TypeScript monorepo for exploring Codex skills, plugin origins, subagent TOML files, and MCP configuration.
 
 ## Packages
 
-- `@codex-inspector/core` — discovery, effective-state analysis, TOML mutations, and explicit MCP tool loading.
-- `@codex-inspector/cli` — `codex-inspect roots`, `skills`, `agents`, and `mcp` commands.
-- `codex-inspector-vscode` — desktop VS Code Activity Bar views for Skills, Agents, MCPs, and Info.
+- `@codex-powertoys/core` — discovery, effective-state analysis, TOML mutations, and explicit MCP tool loading.
+- `@codex-powertoys/cli` — `codex-inspect roots`, `skills`, `agents`, and `mcp` commands.
+- `codex-powertoys-vscode` — desktop VS Code Activity Bar views for Skills, Agents, MCPs, and Info.
 
 ## Development
 

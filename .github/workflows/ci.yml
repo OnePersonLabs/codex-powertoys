@@ -18,4 +18,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      - run: pnpm --filter codex-inspector-vscode package
+      - run: pnpm --filter codex-powertoys-vscode package
