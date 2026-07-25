@@ -21,7 +21,7 @@ test("extension manifest registers inspector views and commands", async () => {
   );
   assert.equal(manifest.icon, "resources/codex-powertoys-icon.png");
   await access(join(extensionRoot, manifest.icon));
-  const views = manifest.contributes.views.codexInspector.map(
+  const views = manifest.contributes.views.codexPowerToys.map(
     (view) => view.id,
   );
   assert.deepEqual(views, [

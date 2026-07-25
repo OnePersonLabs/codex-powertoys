@@ -15,3 +15,4 @@
 - [x] 3.1 Run the focused Agents tree tests and the VS Code extension build.
 - [x] 3.2 Run the existing core test suite to confirm recursive discovery and resource operations remain unchanged.
 - [x] 3.3 Manually or smoke-test a workspace containing nested agent directories and confirm refresh completes and directory expansion shows finite children.
+- [x] 3.4 Align the stale manifest smoke-test view-container key with the current `codexPowerToys` manifest so the full extension test suite runs.
