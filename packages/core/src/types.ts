@@ -79,6 +79,8 @@ export interface SkillRecord {
   description?: string;
   skillPath: string;
   skillDirectory: string;
+  rootPath?: string;
+  relativePath?: string;
   scope: Scope;
   sourceKind: SourceKind;
   plugin?: PluginInfo;
