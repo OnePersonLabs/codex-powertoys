@@ -1,4 +1,4 @@
 interface:
-  display_name: "OpenSpec Reconcile Tasks"
+  display_name: "OPSXX Reconcile Tasks"
   short_description: "Audit OpenSpec tasks against actual implementation state"
   default_prompt: "Use $opsxx-reconcile-tasks to classify completed, stale, and pending tasks."

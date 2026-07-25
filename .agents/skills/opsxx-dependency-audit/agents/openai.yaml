@@ -1,4 +1,4 @@
 interface:
-  display_name: "OpenSpec Dependency Audit"
+  display_name: "OPSXX Dependency Audit"
   short_description: "Report cross-change OpenSpec dependency health"
   default_prompt: "Use $opsxx-dependency-audit to audit active OpenSpec change dependencies."
