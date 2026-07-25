@@ -5,3 +5,4 @@ export * from "./mcp.js";
 export * from "./agents.js";
 export * from "./toml.js";
 export * from "./plugins.js";
+export * from "./resources.js";

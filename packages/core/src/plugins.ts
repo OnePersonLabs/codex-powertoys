@@ -17,7 +17,7 @@ async function walkPluginRoots(root: string, scope: Scope): Promise<PluginRootCa
     const manifestPath = entries.some((entry) => entry.isDirectory() && entry.name === ".codex-plugin") ? join(dir, ".codex-plugin", "plugin.json") : undefined;
     const remoteInstallPath = entries.some((entry) => entry.isFile() && entry.name === ".codex-remote-plugin-install.json") ? join(dir, ".codex-remote-plugin-install.json") : undefined;
     if (manifestPath || remoteInstallPath) {
-      const rel = relative(root, dir); const source = rel.split(/[\\/]/)[0] || basename(root); result.push({ path: resolve(dir), scope, source, manifestPath, remoteInstallPath });
+      const rel = relative(root, dir).split(/[\\/]/).filter(Boolean); const source = (rel[0] === "cache" ? rel[1] : rel[0]) || basename(root); result.push({ path: resolve(dir), scope, source, manifestPath, remoteInstallPath });
     }
     for (const entry of entries) if (entry.isDirectory() && !entry.name.startsWith(".")) await visit(join(dir, entry.name), depth + 1);
   };
@@ -35,6 +35,7 @@ async function skillFiles(root: string): Promise<string[]> {
 }
 
 function stringValue(value: unknown): string | undefined { return typeof value === "string" ? value : undefined; }
+function stringValues(value: unknown): string[] { return typeof value === "string" ? [value] : Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
 
 function pluginKeyCandidates(name: string, source: string): string[] { return [`${name}@${source}`, name]; }
 
@@ -48,16 +49,16 @@ export async function discoverPlugins(options: DiscoveryOptions = {}): Promise<{
   const globalOverrides = parsePluginOverrides(globalText, roots.globalConfigPath, "global"); const workspaceOverrides = roots.workspaceConfigPath ? parsePluginOverrides(workspaceText, roots.workspaceConfigPath, "workspace") : [];
   const plugins: PluginRecord[] = []; const diagnostics: Diagnostic[] = [];
   for (const candidate of candidates) {
-    const manifestResult = await readJson(candidate.manifestPath); const remoteResult = await readJson(candidate.remoteInstallPath); const metadata = manifestResult.value ?? {};
-    if (manifestResult.diagnostic) diagnostics.push(manifestResult.diagnostic); if (remoteResult.diagnostic) diagnostics.push(remoteResult.diagnostic);
-    const name = stringValue(metadata.name) ?? basename(candidate.path); const version = stringValue(metadata.version); const id = stringValue(metadata.id) ?? stringValue(remoteResult.value?.remote_plugin_id) ?? `${candidate.scope}:${candidate.path}`;
+    const manifestResult = await readJson(candidate.manifestPath); const remoteResult = await readJson(candidate.remoteInstallPath); const metadata = manifestResult.value ?? {}; const pluginDiagnostics: Diagnostic[] = [];
+    if (manifestResult.diagnostic) { diagnostics.push(manifestResult.diagnostic); pluginDiagnostics.push(manifestResult.diagnostic); } if (remoteResult.diagnostic) { diagnostics.push(remoteResult.diagnostic); pluginDiagnostics.push(remoteResult.diagnostic); }
+    const fallbackName = candidate.manifestPath ? basename(dirname(candidate.path)) : basename(candidate.path); const name = stringValue(metadata.name) ?? fallbackName; const version = stringValue(metadata.version) ?? (candidate.manifestPath ? basename(candidate.path) : undefined); const id = stringValue(metadata.id) ?? stringValue(remoteResult.value?.remote_plugin_id) ?? `${candidate.scope}:${candidate.path}`;
     const keyOverride = matchingOverride(candidate.scope === "workspace" ? workspaceOverrides : [...workspaceOverrides, ...globalOverrides], name, candidate.source) ?? matchingOverride(globalOverrides, name, candidate.source);
     const effectiveOverride = candidate.scope === "workspace" ? matchingOverride(workspaceOverrides, name, candidate.source) ?? matchingOverride(globalOverrides, name, candidate.source) : matchingOverride(globalOverrides, name, candidate.source);
     const configPath = effectiveOverride?.configPath; const configKey = effectiveOverride?.key; const enabled = effectiveOverride?.enabled !== false;
-    const declaredSkills = stringValue(metadata.skills); const skillsRoot = declaredSkills ? resolve(candidate.path, declaredSkills) : join(candidate.path, "skills"); const skillPaths = await skillFiles(skillsRoot);
-    const mcpPath = join(candidate.path, ".mcp.json"); const mcpResult = await readJson(mcpPath); if (mcpResult.diagnostic) diagnostics.push(mcpResult.diagnostic); const mcpServers = mcpResult.value?.mcpServers; const mcpNames = mcpServers && typeof mcpServers === "object" ? Object.keys(mcpServers as Record<string, unknown>) : [];
-    const info: PluginInfo = { id, name, version, root: candidate.path, scope: candidate.scope, source: candidate.source, enabled, configPath, configKey, manifestPath: candidate.manifestPath, mcpPath: (await exists(mcpPath)) ? mcpPath : undefined, readOnly: true, metadata };
-    plugins.push({ ...info, id, diagnostics: [], sourceRange: effectiveOverride?.range, skillPaths, mcpNames });
+    const declaredSkills = stringValues(metadata.skills); const skillRoots = declaredSkills.length ? declaredSkills.map((value) => resolve(candidate.path, value)) : [join(candidate.path, "skills")]; const skillPaths: string[] = []; for (const skillsRoot of skillRoots) { if (declaredSkills.length && !(await exists(skillsRoot))) pluginDiagnostics.push({ code: "PLUGIN_SKILLS_MISSING", message: `Declared plugin skills directory is missing: ${skillsRoot}`, path: skillsRoot, severity: "warning" }); skillPaths.push(...await skillFiles(skillsRoot)); }
+    const declaredMcp = stringValue(metadata.mcpServers); const mcpCandidate = declaredMcp ? resolve(candidate.path, declaredMcp) : join(candidate.path, ".mcp.json"); const mcpPath = (await exists(mcpCandidate)) ? mcpCandidate : undefined; if (declaredMcp && !mcpPath) pluginDiagnostics.push({ code: "PLUGIN_MCP_MISSING", message: `Declared plugin MCP file is missing: ${mcpCandidate}`, path: mcpCandidate, severity: "warning" }); const mcpResult = await readJson(mcpPath); if (mcpResult.diagnostic) { diagnostics.push(mcpResult.diagnostic); pluginDiagnostics.push(mcpResult.diagnostic); } const mcpServers = mcpResult.value?.mcpServers; const mcpNames = mcpServers && typeof mcpServers === "object" ? Object.keys(mcpServers as Record<string, unknown>) : [];
+    const info: PluginInfo = { id, name, version, root: candidate.path, scope: candidate.scope, source: candidate.source, enabled, configPath, configKey, manifestPath: candidate.manifestPath, mcpPath, readOnly: true, metadata };
+    plugins.push({ ...info, id, diagnostics: pluginDiagnostics, sourceRange: effectiveOverride?.range, skillPaths, mcpNames });
     void keyOverride;
   }
   return { plugins: plugins.sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root)), diagnostics };
@@ -73,7 +74,7 @@ export async function pluginMcpRecords(plugin: PluginRecord, configPath = plugin
   const mcps: McpRecord[] = []; const diagnostics: Diagnostic[] = [];
   for (const [name, raw] of Object.entries(values as Record<string, unknown>)) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) { diagnostics.push({ code: "PLUGIN_MCP_INVALID", message: `MCP definition ${name} is not an object`, path: configPath, severity: "warning" }); continue; }
-    const config = { ...(raw as Record<string, unknown>) }; if (config.type === "http" && !config.url && typeof config.url === "string") config.url = config.url;
+    const config = { ...(raw as Record<string, unknown>) };
     const text = await readFile(configPath, "utf8"); const line = text.split(/\r?\n/).findIndex((item) => new RegExp(`^[\\s\\t]*[\"']?${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\"?\\s*:`).test(item)); const startLine = line < 0 ? 0 : line;
     mcps.push({ id: `${plugin.id}:mcp:${name}`, name, scope: plugin.scope ?? "global", sourceKind: "plugin", plugin, configPath, config, enabled: plugin.enabled, pluginEnabled: plugin.enabled, effective: plugin.enabled ? "active" : "unavailable", disabledByPlugin: !plugin.enabled, workingDirectory: resolve(plugin.root, typeof config.cwd === "string" ? config.cwd : "."), readOnly: true, sourceRange: { path: configPath, startLine, endLine: startLine }, diagnostics: [] });
   }

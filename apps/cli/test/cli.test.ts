@@ -26,3 +26,9 @@ test("MCP mutation reports a non-zero error for an unknown server", async () => 
     const value = error as { code?: number; stderr?: string }; return value.code === 1 && /MCP not found/.test(value.stderr ?? "");
   });
 });
+
+test("plugin list exposes ownership and disabled state", async () => {
+  const root = await mkdtemp(resolve(tmpdir(), "codex-powertoys-plugin-cli-")); const home = resolve(root, "home"); const codex = resolve(home, ".codex"); const workspace = resolve(root, "workspace"); const pluginRoot = resolve(codex, "plugins", "cache", "source", "demo", "1.0.0");
+  await mkdir(resolve(pluginRoot, ".codex-plugin"), { recursive: true }); await mkdir(workspace, { recursive: true }); await writeFile(resolve(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "demo", version: "1.0.0" })); await writeFile(resolve(codex, "config.toml"), "[plugins.\"demo@source\"]\nenabled = false\n");
+  const result = await run(process.execPath, [cli, "plugins", "list", "--codex-home", codex, "--workspace", workspace, "--json"]); const parsed = JSON.parse(result.stdout) as { plugins: Array<{ name: string; enabled: boolean }> }; assert.equal(parsed.plugins[0]?.name, "demo"); assert.equal(parsed.plugins[0]?.enabled, false);
+});

@@ -1,15 +1,22 @@
 import { spawn } from "node:child_process";
 import { addMcp, deleteMcp, parseMcpSections, readConfig, setMcpEnabled, updateMcp } from "./toml.js";
 import { resolveRoots } from "./paths.js";
+import { discoverPlugins, pluginMcpRecords } from "./plugins.js";
 import type { DiscoveryOptions, Diagnostic, McpRecord, McpTool, McpToolOptions, McpToolResult, McpTransport, RootSet, Scope } from "./types.js";
 
 export async function discoverMcps(options: DiscoveryOptions = {}): Promise<{ roots: RootSet; mcps: McpRecord[]; diagnostics: Diagnostic[] }> {
-  const roots = await resolveRoots(options); const mcps: McpRecord[] = []; const diagnostics: Diagnostic[] = [];
+  const roots = await resolveRoots(options); const pluginCatalog = await discoverPlugins(options); const mcps: McpRecord[] = []; const diagnostics: Diagnostic[] = [...pluginCatalog.diagnostics];
   for (const [scope, path] of [["global", roots.globalConfigPath], ["workspace", roots.workspaceConfigPath]] as const) {
     if (!path) continue;
     try { mcps.push(...parseMcpSections(await readConfig(path), path, scope)); } catch (error) { diagnostics.push({ code: "MCP_CONFIG_INVALID", message: error instanceof Error ? error.message : String(error), path, severity: "error" }); }
   }
-  return { roots, mcps: mcps.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope)), diagnostics };
+  for (const plugin of pluginCatalog.plugins) { const result = await pluginMcpRecords(plugin); mcps.push(...result.mcps); diagnostics.push(...result.diagnostics); }
+  const precedence = (record: McpRecord) => record.scope === "workspace" ? 0 : record.sourceKind === "config" ? 1 : 2; const grouped = new Map<string, McpRecord[]>(); for (const record of mcps) (grouped.get(record.name) ?? (grouped.set(record.name, []), grouped.get(record.name)!)).push(record);
+  for (const group of grouped.values()) {
+    const candidates = group.filter((record) => record.pluginEnabled && record.enabled).sort((a, b) => precedence(a) - precedence(b) || a.id.localeCompare(b.id)); const winner = candidates[0];
+    for (const record of group) { record.pluginEnabled = record.plugin?.enabled ?? true; record.disabledByPlugin = !record.pluginEnabled; if (!record.pluginEnabled) record.effective = "unavailable"; else if (!record.enabled) record.effective = "disabled"; else if (winner && winner !== record) { record.effective = "shadowed"; record.shadowedBy = winner.id; } else record.effective = "active"; }
+  }
+  return { roots, mcps: mcps.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope) || a.sourceKind.localeCompare(b.sourceKind)), diagnostics };
 }
 
 export async function setMcpState(options: DiscoveryOptions, scope: Scope, name: string, enabled: boolean) {
@@ -34,7 +41,7 @@ class JsonLineTransport implements McpTransport {
 async function defaultTransport(record: McpRecord, timeoutMs: number): Promise<{ transport: McpTransport; kind: "stdio" | "url" }> {
   const command = typeof record.config.command === "string" ? record.config.command : undefined;
   if (command) {
-    const args = Array.isArray(record.config.args) ? record.config.args.map(String) : []; const child = spawn(command, args, { env: { ...process.env, ...(typeof record.config.env === "object" ? record.config.env as Record<string, string> : {}) }, stdio: ["pipe", "pipe", "pipe"] });
+    const args = Array.isArray(record.config.args) ? record.config.args.map(String) : []; const child = spawn(command, args, { cwd: record.workingDirectory, env: { ...process.env, ...(typeof record.config.env === "object" ? record.config.env as Record<string, string> : {}) }, stdio: ["pipe", "pipe", "pipe"] });
     return { transport: new JsonLineTransport(child, timeoutMs), kind: "stdio" };
   }
   const url = typeof record.config.url === "string" ? record.config.url : undefined; if (!url) throw new Error("MCP has neither command nor url");

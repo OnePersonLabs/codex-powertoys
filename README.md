@@ -5,8 +5,8 @@ Codex PowerToys is a TypeScript monorepo for exploring Codex skills, plugin orig
 ## Packages
 
 - `@codex-powertoys/core` — discovery, effective-state analysis, TOML mutations, and explicit MCP tool loading.
-- `@codex-powertoys/cli` — `codex-inspect roots`, `skills`, `agents`, and `mcp` commands.
-- `codex-powertoys-vscode` — desktop VS Code Activity Bar views for Skills, Agents, MCPs, and Info.
+- `@codex-powertoys/cli` — `codex-inspect` commands for roots, skills, plugins, agents, MCPs, and resource transfers.
+- `codex-powertoys-vscode` — desktop VS Code Activity Bar views for Skills, Plugins, Agents, MCPs, and Info.
 
 ## Development
 
@@ -18,3 +18,26 @@ pnpm package:vscode
 ```
 
 The extension resolves user and plugin paths on the active extension host. MCP tool discovery is explicit and never happens merely by selecting a server.
+
+## CLI examples
+
+All discovery commands accept `--codex-home <path>`, `--workspace <path>`, and `--json`.
+
+```bash
+codex-inspect plugins list --json
+codex-inspect plugins set "my-plugin@local" --scope global --disable
+codex-inspect agents list
+codex-inspect mcp list --workspace .
+codex-inspect resource rename skill /path/to/skill renamed-skill
+codex-inspect resource transfer skill old-name --scope workspace --operation copy --conflict replace
+```
+
+Plugin manifests and plugin-owned resources are discovered from the Codex plugin cache and workspace plugin directories. Plugin sources are read-only; copying a plugin skill or MCP into a managed scope is the supported export path. A disabled plugin makes its contained skills and MCPs unavailable.
+
+## VS Code workflows
+
+Open the **Codex PowerToys** Activity Bar container to use the Skills, Plugins, Agents, MCPs, and Info views. Toolbar actions use icons with hover tooltips. Skills, MCPs, and agents support multi-selection, context-menu cut/copy/paste, rename, delete, and native drag/drop. Move and delete operations use modal confirmations; paste conflicts offer skip, replace, decide-each, or cancel.
+
+The Agents view starts with expanded global (`~/.codex/agents`) and workspace (`.codex/agents`) roots and preserves relative paths during transfers. Plugin entries expose metadata, enable/disable/reset actions, manifests, and child resources while keeping the plugin cache immutable. MCP tools are loaded only when **Load MCP Tools** is explicitly invoked.
+
+Native VS Code TreeViews do not expose Ctrl/Shift modifier state to drag/drop handlers, so drag/drop is a confirmed move. Use **Copy** followed by **Paste** for a reliable copy operation.

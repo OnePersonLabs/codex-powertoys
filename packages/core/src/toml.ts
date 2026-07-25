@@ -97,7 +97,7 @@ export function parseMcpSections(text: string, configPath: string, scope: Scope)
     for (const nested of sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name && candidate.path.length > 2)) {
       let target = config; const parts = nested.path.slice(2); for (const part of parts) target = (target[part] ??= {}) as Record<string, unknown>; for (const [key, value] of Object.entries(nested.values)) if (key !== "__array") target[key] = value;
     }
-    return { id: `${scope}:${configPath}:${name}`, name, scope, configPath, config, enabled: config.enabled !== false, explicitEnabled: typeof config.enabled === "boolean" ? config.enabled : undefined, sourceRange: { path: configPath, startLine: section.startLine, endLine: Math.max(section.endLine, ...sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name).map((candidate) => candidate.endLine)) }, diagnostics: [] };
+    return { id: `${scope}:${configPath}:${name}`, name, scope, sourceKind: "config", configPath, config, enabled: config.enabled !== false, pluginEnabled: true, effective: config.enabled === false ? "disabled" : "active", explicitEnabled: typeof config.enabled === "boolean" ? config.enabled : undefined, sourceRange: { path: configPath, startLine: section.startLine, endLine: Math.max(section.endLine, ...sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name).map((candidate) => candidate.endLine)) }, diagnostics: [] };
   });
 }
 
@@ -126,6 +126,17 @@ export async function setSkillOverride(configPath: string, skillPath: string, en
   const nextText = lines.join("\n");
   if (nextText === original) return { path: configPath, changed: false };
   await writeConfig(configPath, nextText); return { path: configPath, changed: true };
+}
+
+export async function updateSkillPathReferences(configPath: string, oldPath: string, newPath: string): Promise<ConfigMutationResult> {
+  const original = await readConfig(configPath); const lines = linesOf(original); let changed = false;
+  for (const section of parseSections(original).filter((candidate) => candidate.path.join(".") === "skills.config")) {
+    for (let index = section.startLine; index <= section.endLine; index++) {
+      const line = lines[index] ?? ""; const match = line.match(/^(\s*path\s*=\s*)(["'])(.*?)(\2)(\s*(?:#.*)?)$/);
+      if (match?.[3] === oldPath) { lines[index] = `${match[1]}${match[2]}${newPath}${match[4]}${match[5] ?? ""}`; changed = true; }
+    }
+  }
+  if (!changed) return { path: configPath, changed: false }; await writeConfig(configPath, lines.join("\n")); return { path: configPath, changed: true };
 }
 
 function mcpHeader(name: string): RegExp { return new RegExp(`^\\[mcp_servers\\.(?:\\"${escapeRegExp(name)}\\"|${escapeRegExp(name)})\\]$`); }
@@ -184,6 +195,13 @@ export async function deleteMcp(configPath: string, name: string): Promise<Confi
   const original = await readConfig(configPath); const lines = linesOf(original); const start = lines.findIndex((line) => mcpHeader(name).test(line.trim())); if (start < 0) return { path: configPath, changed: false };
   const end = mcpSectionEnd(lines, start, name);
   lines.splice(start, end - start + 1); const nextText = lines.join("\n").replace(/\n{3,}/g, "\n\n"); await writeConfig(configPath, nextText); return { path: configPath, changed: true };
+}
+
+export async function renameMcp(configPath: string, oldName: string, newName: string): Promise<ConfigMutationResult> {
+  if (oldName === newName) return { path: configPath, changed: false }; const original = await readConfig(configPath); const records = parseMcpSections(original, configPath, "global"); if (!records.some((record) => record.name === oldName)) throw new Error(`MCP not found: ${oldName}`); if (records.some((record) => record.name === newName)) throw new Error(`MCP already exists: ${newName}`);
+  const oldPattern = new RegExp(`^(\\s*\\[+mcp_servers\\.)(?:\\"${escapeRegExp(oldName)}\\"|${escapeRegExp(oldName)})(?=(?:\\.|\\]))`); const lines = linesOf(original); let changed = false;
+  for (let index = 0; index < lines.length; index++) { const next = lines[index]!.replace(oldPattern, (_match, prefix: string) => `${prefix}${quoteKey(newName)}`); if (next !== lines[index]) { lines[index] = next; changed = true; } }
+  if (!changed) return { path: configPath, changed: false }; await writeConfig(configPath, lines.join("\n")); return { path: configPath, changed: true };
 }
 
 export function diagnosticsFromError(error: unknown, path?: string): Diagnostic { return { code: "CONFIG_ERROR", message: error instanceof Error ? error.message : String(error), path, severity: "error" }; }
