@@ -1,0 +1,77 @@
+{
+  "name": "codex-inspector-vscode",
+  "displayName": "Codex Inspector",
+  "description": "Inspect Codex skills, plugins, agents, and MCP configuration.",
+  "version": "0.1.0",
+  "publisher": "codex-inspector",
+  "license": "MIT",
+  "engines": { "vscode": "^1.110.0" },
+  "main": "./dist/extension.js",
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
+    "test": "tsx --test test/**/*.test.ts",
+    "vscode:prepublish": "pnpm build",
+    "package": "pnpm build && npx @vscode/vsce package"
+  },
+  "devDependencies": { "@codex-inspector/core": "workspace:*", "@types/vscode": "^1.110.0", "esbuild": "^0.25.0", "@vscode/vsce": "^3.6.0", "typescript": "^5.9.0", "tsx": "^4.20.3" },
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "codexInspector", "title": "Codex Inspector", "icon": "resources/icon.svg" }] },
+    "views": { "codexInspector": [
+      { "id": "codexInspector.skills", "name": "Skills" },
+      { "id": "codexInspector.agents", "name": "Agents" },
+      { "id": "codexInspector.mcps", "name": "MCPs" },
+      { "id": "codexInspector.info", "name": "Info", "type": "webview" }
+    ] },
+    "commands": [
+      { "command": "codexInspector.refresh", "title": "Codex Inspector: Refresh" },
+      { "command": "codexInspector.skills.toggleMode", "title": "Codex Inspector: Toggle Skill Tree/Flat View" },
+      { "command": "codexInspector.skills.toggleSupporting", "title": "Codex Inspector: Toggle Supporting Files" },
+      { "command": "codexInspector.skills.filter", "title": "Codex Inspector: Filter Skills" },
+      { "command": "codexInspector.skills.enableGlobal", "title": "Enable (Global)" },
+      { "command": "codexInspector.skills.disableGlobal", "title": "Disable (Global)" },
+      { "command": "codexInspector.skills.resetGlobal", "title": "Reset (Global)" },
+      { "command": "codexInspector.skills.enableLocal", "title": "Enable (Local)" },
+      { "command": "codexInspector.skills.disableLocal", "title": "Disable (Local)" },
+      { "command": "codexInspector.skills.resetLocal", "title": "Reset (Local)" },
+      { "command": "codexInspector.startSkillCreator", "title": "Codex Inspector: Start Skill Creator Chat" },
+      { "command": "codexInspector.refreshAgents", "title": "Codex Inspector: Refresh Agents" },
+      { "command": "codexInspector.mcp.add", "title": "Codex Inspector: Add MCP" },
+      { "command": "codexInspector.mcp.edit", "title": "Codex Inspector: Edit MCP" },
+      { "command": "codexInspector.mcp.delete", "title": "Codex Inspector: Delete MCP" },
+      { "command": "codexInspector.mcp.loadTools", "title": "Codex Inspector: Load MCP Tools" },
+      { "command": "codexInspector.info.toggleExpand", "title": "Codex Inspector: Toggle Expand All" },
+      { "command": "codexInspector.mcp.enableGlobal", "title": "Enable MCP (Global)" },
+      { "command": "codexInspector.mcp.disableGlobal", "title": "Disable MCP (Global)" },
+      { "command": "codexInspector.mcp.enableLocal", "title": "Enable MCP (Local)" },
+      { "command": "codexInspector.mcp.disableLocal", "title": "Disable MCP (Local)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "codexInspector.refresh", "when": "view == codexInspector.skills || view == codexInspector.mcps", "group": "navigation" },
+        { "command": "codexInspector.skills.toggleMode", "when": "view == codexInspector.skills", "group": "navigation" },
+        { "command": "codexInspector.skills.toggleSupporting", "when": "view == codexInspector.skills", "group": "navigation" },
+        { "command": "codexInspector.startSkillCreator", "when": "view == codexInspector.skills", "group": "navigation" },
+        { "command": "codexInspector.refreshAgents", "when": "view == codexInspector.agents", "group": "navigation" },
+        { "command": "codexInspector.mcp.add", "when": "view == codexInspector.mcps", "group": "navigation" }
+        ,{ "command": "codexInspector.info.toggleExpand", "when": "view == codexInspector.info", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "codexInspector.skills.enableGlobal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.skills.disableGlobal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.skills.resetGlobal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.skills.enableLocal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.skills.disableLocal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.skills.resetLocal", "when": "view == codexInspector.skills && viewItem == codexSkill" },
+        { "command": "codexInspector.mcp.edit", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.delete", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.loadTools", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.enableGlobal", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.disableGlobal", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.enableLocal", "when": "view == codexInspector.mcps && viewItem == codexMcp" },
+        { "command": "codexInspector.mcp.disableLocal", "when": "view == codexInspector.mcps && viewItem == codexMcp" }
+      ]
+    }
+  }
+}

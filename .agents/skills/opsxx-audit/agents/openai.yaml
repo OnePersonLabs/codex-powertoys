@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenSpec Audit"
+  short_description: "Find code/spec drift and orphaned specs"
+  default_prompt: "Use $opsxx-audit to audit current implementation against the OpenSpec specs."
