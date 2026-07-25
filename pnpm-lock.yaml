@@ -20,7 +20,7 @@ importers:
 
   apps/cli:
     dependencies:
-      '@codex-inspector/core':
+      '@codex-powertoys/core':
         specifier: workspace:*
         version: link:../../packages/core
       commander:
@@ -28,11 +28,10 @@ importers:
         version: 14.0.3
 
   apps/vscode:
-    dependencies:
-      '@codex-inspector/core':
+    devDependencies:
+      '@codex-powertoys/core':
         specifier: workspace:*
         version: link:../../packages/core
-    devDependencies:
       '@types/vscode':
         specifier: ^1.110.0
         version: 1.125.0

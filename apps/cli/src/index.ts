@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { addMcpDefinition, deleteMcpDefinition, discoverAgents, discoverMcps, discoverSkills, discoverRoots, loadMcpTools, setMcpState, setSkillEnabled, updateMcpDefinition } from "@codex-inspector/core";
+import { addMcpDefinition, deleteMcpDefinition, discoverAgents, discoverMcps, discoverSkills, discoverRoots, loadMcpTools, setMcpState, setSkillEnabled, updateMcpDefinition } from "@codex-powertoys/core";
 
 function options(command: Command): Command { return command.option("--json", "emit JSON output").option("--workspace <path>", "workspace root").option("--codex-home <path>", "Codex home directory"); }
 function output(value: unknown, json?: boolean): void { if (json) console.log(JSON.stringify(value, null, 2)); else if (typeof value === "string") console.log(value); else console.dir(value, { depth: 8, colors: true }); }

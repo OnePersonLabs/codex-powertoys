@@ -1,5 +1,5 @@
 {
-  "name": "@codex-inspector/core",
+  "name": "@codex-powertoys/core",
   "version": "0.1.0",
   "type": "module",
   "exports": {
@@ -8,7 +8,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test test/**/*.test.ts"

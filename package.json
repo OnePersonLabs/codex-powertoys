@@ -1,13 +1,13 @@
 {
-  "name": "codex-inspector",
+  "name": "codex-powertoys",
   "private": true,
   "packageManager": "pnpm@10.30.0",
   "scripts": {
-    "build": "pnpm --filter @codex-inspector/core build && pnpm --filter @codex-inspector/cli build && pnpm --filter codex-inspector-vscode build",
-    "test": "pnpm --filter @codex-inspector/core test && pnpm --filter @codex-inspector/cli test && pnpm --filter codex-inspector-vscode test",
+    "build": "pnpm --filter @codex-powertoys/core build && pnpm --filter @codex-powertoys/cli build && pnpm --filter codex-powertoys-vscode build",
+    "test": "pnpm --filter @codex-powertoys/core test && pnpm --filter @codex-powertoys/cli test && pnpm --filter codex-powertoys-vscode test",
     "check": "pnpm build && pnpm test",
-    "package:cli": "pnpm --filter @codex-inspector/cli build && pnpm --filter @codex-inspector/cli pack",
-    "package:vscode": "pnpm --filter codex-inspector-vscode package"
+    "package:cli": "pnpm --filter @codex-powertoys/cli build && pnpm --filter @codex-powertoys/cli pack",
+    "package:vscode": "pnpm --filter codex-powertoys-vscode package"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
