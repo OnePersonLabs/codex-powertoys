@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import { basename, dirname, join } from "node:path";
 import {
+  agentTreeChildren,
+  agentTreeExpansion,
+} from "./agent-tree.js";
+import {
   discoverAgents,
   discoverMcps,
   discoverPlugins,
@@ -345,12 +349,20 @@ class AgentsProvider implements vscode.TreeDataProvider<Node> {
     this.emitter.fire(undefined);
   }
   getTreeItem(node: Node): vscode.TreeItem {
-    const collapsible = node.kind === "root" || node.kind === "agentDir";
+    const expansion = agentTreeExpansion(
+      node.kind === "root"
+        ? "root"
+        : node.kind === "agentDir"
+          ? "agentDir"
+          : "leaf",
+    );
     const item = new vscode.TreeItem(
       node.label,
-      collapsible
+      expansion === "expanded"
         ? vscode.TreeItemCollapsibleState.Expanded
-        : vscode.TreeItemCollapsibleState.None,
+        : expansion === "collapsed"
+          ? vscode.TreeItemCollapsibleState.Collapsed
+          : vscode.TreeItemCollapsibleState.None,
     );
     item.id = `${node.kind}:${node.agent?.id ?? node.targetPath ?? node.label}`;
     item.contextValue =
@@ -387,52 +399,37 @@ class AgentsProvider implements vscode.TreeDataProvider<Node> {
           targetPath: this.workspaceRoot,
         },
       ];
-    const root = node.targetPath;
+    const root =
+      node.scope === "global" ? this.globalRoot : this.workspaceRoot;
     if (!root || !node.scope) return [];
-    const records = this.agents.filter((agent) => agent.scope === node.scope);
-    const parentRelative =
-      node.kind === "root"
-        ? ""
-        : node.entry?.path
-          ? node.entry.path.slice(root.length + 1)
-          : "";
-    const dirs = new Set<string>();
-    const files: AgentRecord[] = [];
-    for (const agent of records) {
-      const rel = agent.relativePath.replaceAll("\\", "/");
-      const prefix = parentRelative ? `${parentRelative}/` : "";
-      const remainder = rel.startsWith(prefix) ? rel.slice(prefix.length) : "";
-      if (!remainder || remainder.includes("/")) {
-        const segment = remainder.split("/")[0];
-        if (segment) dirs.add(segment);
-        continue;
-      }
-      files.push(agent);
-    }
-    const directoryNodes: Node[] = [...dirs]
-      .sort()
-      .map((name) => ({
-        kind: "agentDir",
-        label: name,
-        scope: node.scope,
-        targetPath: join(root, parentRelative, name),
-        relativePath: join(parentRelative, name),
-        entry: {
-          name,
-          path: join(root, parentRelative, name),
-          kind: "directory",
-        },
-      }));
-    const fileNodes: Node[] = files
-      .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
-      .map((agent) => ({
-        kind: "agent",
-        label: `📄 ${agent.name}`,
-        scope: agent.scope,
-        targetPath: agent.path,
-        agent,
-      }));
-    return [...directoryNodes, ...fileNodes];
+    const children = agentTreeChildren(
+      this.agents,
+      node.scope,
+      root,
+      node.kind === "root" ? "" : node.relativePath,
+    );
+    return children.map((child): Node =>
+      child.kind === "directory"
+        ? {
+            kind: "agentDir",
+            label: child.name,
+            scope: node.scope,
+            targetPath: child.path,
+            relativePath: child.relativePath,
+            entry: {
+              name: child.name,
+              path: child.path,
+              kind: "directory",
+            },
+          }
+        : {
+            kind: "agent",
+            label: `📄 ${child.agent.name}`,
+            scope: child.agent.scope,
+            targetPath: child.agent.path,
+            agent: child.agent,
+          },
+    );
   }
 }
 
