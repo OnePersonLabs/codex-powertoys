@@ -34,3 +34,14 @@ Resource rows SHALL use a shared status-glyph decision matrix followed by a stab
 #### Scenario: No native resource checkboxes
 - **WHEN** a resource row is rendered in the unified view
 - **THEN** the row does not set `TreeItem.checkboxState`, and enablement is performed through the existing context or toolbar commands
+
+### Requirement: Superseded resource visibility
+The Resources tree SHALL provide a toolbar toggle that hides or shows records whose effective state is `shadowed`; when hidden, those records and any groups that would contain only them SHALL be omitted, and Agents SHALL not expose this toggle.
+
+#### Scenario: Hide superseded records
+- **WHEN** superseded visibility is off
+- **THEN** shadowed plugins, MCPs, and Skills are absent and non-empty ancestor groups remain visible
+
+#### Scenario: Show superseded records
+- **WHEN** the user enables the Resources superseded toggle
+- **THEN** shadowed records appear with their original source paths and use ☑️ when superseded by an enabled winner or ✖️ when superseded by a disabled or unavailable winner

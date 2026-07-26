@@ -157,4 +157,4 @@ The Resources tree SHALL provide a toolbar toggle that hides or shows records wh
 
 #### Scenario: Show superseded records
 - **WHEN** the user enables the Resources superseded toggle
-- **THEN** shadowed records appear with their original source paths and ✖️ status glyphs
+- **THEN** shadowed records appear with their original source paths and use ☑️ when superseded by an enabled winner or ✖️ when superseded by a disabled or unavailable winner
