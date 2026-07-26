@@ -1,5 +1,6 @@
-.vscode
-node_modules
-src
+.vscode/**
+src/**
 tsconfig.json
+**/*.map
+node_modules/**
 *.tsbuildinfo

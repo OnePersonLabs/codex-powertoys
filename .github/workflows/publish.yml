@@ -17,5 +17,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to VS Code Marketplace
+        working-directory: apps/vscode
+        run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
