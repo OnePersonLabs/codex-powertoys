@@ -1,5 +1,28 @@
 # Codex PowerToys VS Code Extension
 
+![demo](../../docs/resources/demo.gif)
+
+Codex PowerToys is a TypeScript monorepo for exploring Codex skills, plugin origins, subagent TOML files, and MCP configuration.
+
+## Icons
+
+### 🔌 Plugins 🧰 MCPs 💪 Skills:
+
+- ✅ **Enabled and primary**. If multiple items have the same name, this is the one that gets used when referenced in codex.
+- ☑️ **Enabled but superseded** by another item with the same name. A skill in the global ~/.codex/skills dir will be superceded by a skill with the same name found in the workspace's .agents/skills/ dir.
+- ❌ **Disabled**. Explicitly disabled in global or workspace codex.toml
+- ✖️ **Superceded**. Explicitly Superceded.
+
+### 🔨 MCP Tools:
+
+The first icon represents the configured permission:
+
+- ✅ Allowed
+- ❌ Denied
+- ✋ Ask
+
+---
+
 This desktop extension provides Resources, Skills, MCPs, Agents, and Info views over the shared Codex PowerToys core. Install the generated VSIX with `code --install-extension <file>.vsix`.
 
 The extension runs in a desktop Node extension host and resolves global Codex paths on that host. It discovers plugin manifests, remote-install metadata, plugin skills, and plugin `.mcp.json` files, while keeping plugin source files read-only.
