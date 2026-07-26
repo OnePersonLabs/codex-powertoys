@@ -2,20 +2,23 @@
   "name": "codex-powertoys-vscode",
   "displayName": "Codex PowerToys",
   "description": "Inspect and safely manage Codex skills, plugins, agents, and MCP configuration.",
+  "version": "1.0.0",
+  "publisher": "onepersonlabs",
+  "license": "MIT",
   "repository": {
+    "type": "git",
     "url": "https://github.com/OnePersonLabs/codex-powertoys"
   },
-  "version": "1.0.0",
-  "publisher": "codex-powertoys",
-  "license": "MIT",
-  "icon": "resources/codex-powertoys-icon.png",
   "engines": {
     "vscode": "^1.110.0"
   },
-  "main": "./dist/extension.js",
   "categories": [
+    "Chat",
+    "AI",
     "Other"
   ],
+  "icon": "resources/codex-powertoys-icon.png",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
   ],

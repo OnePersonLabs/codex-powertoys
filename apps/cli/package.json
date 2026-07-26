@@ -1,6 +1,13 @@
 {
   "name": "@codex-powertoys/cli",
+  "description": "Inspect and safely manage Codex skills, plugins, agents, and MCP configuration.",
   "version": "1.0.0",
+  "publisher": "onepersonlabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OnePersonLabs/codex-powertoys"
+  },
   "type": "module",
   "bin": {
     "codex-inspect": "dist/index.js"
