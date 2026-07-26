@@ -8,6 +8,14 @@
     "type": "git",
     "url": "https://github.com/OnePersonLabs/codex-powertoys"
   },
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Chat",
+    "AI",
+    "Other"
+  ],
   "private": false,
   "packageManager": "pnpm@10.30.0",
   "scripts": {

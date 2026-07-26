@@ -18,4 +18,4 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npx vsce publish --pat ${{ secrets.VSCE_PAT }}
+      - run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
