@@ -367,11 +367,11 @@
       "view/item/context": [
         {
           "command": "codexPowerToys.resource.cut",
-          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents) && viewItem != codexRoot && viewItem != codexPlugin && viewItem != codexResourceGroup"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents) && viewItem != codexRoot && viewItem != codexPlugin && viewItem != codexResourceGroup && viewItem != codexMcpTool"
         },
         {
           "command": "codexPowerToys.resource.copy",
-          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents) && viewItem != codexMcpTool"
         },
         {
           "command": "codexPowerToys.resource.copyFullPath",
@@ -383,7 +383,7 @@
         },
         {
           "command": "codexPowerToys.resource.paste",
-          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents) && viewItem != codexMcpTool"
         },
         {
           "command": "codexPowerToys.resource.rename",

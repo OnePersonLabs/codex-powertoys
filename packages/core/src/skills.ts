@@ -16,7 +16,10 @@ function frontmatter(content: string): Record<string, string> {
 }
 
 async function metadataFor(skillDirectory: string, diagnostics: Diagnostic[]): Promise<SkillMetadata | undefined> {
-  const path = join(skillDirectory, "agents", "openai.yaml"); if (!(await fileExists(path))) return undefined;
+  const agentsDirectory = join(skillDirectory, "agents");
+  const yamlPath = join(agentsDirectory, "openai.yml");
+  const path = (await fileExists(yamlPath)) ? yamlPath : join(agentsDirectory, "openai.yaml");
+  if (!(await fileExists(path))) return undefined;
   try {
     const parsed = YAML.parse(await readFile(path, "utf8")) as Record<string, unknown>;
     const iface = (parsed.interface ?? {}) as Record<string, unknown>;
@@ -54,13 +57,13 @@ export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ 
     for (const skillPath of await discoverFiles(root.path)) {
       const itemDiagnostics: Diagnostic[] = []; const content = await readFile(skillPath, "utf8"); const front = frontmatter(content); const plugin = root.sourceKind === "plugin" ? pluginForPath(skillPath, pluginCatalog.plugins) : undefined;
       const metadata = await metadataFor(dirname(skillPath), itemDiagnostics); const name = metadata?.name ?? front.name ?? basename(dirname(skillPath));
-      records.push({ id: resolve(skillPath), name, description: metadata?.shortDescription ?? front.description, skillPath: resolve(skillPath), skillDirectory: dirname(skillPath), rootPath: root.path, relativePath: relative(root.path, dirname(skillPath)), scope: root.scope, sourceKind: root.sourceKind, plugin, metadata, content, supportingEntries: await tree(dirname(skillPath), dirname(skillPath)), state: { global: "default", workspace: "default", pluginEnabled: plugin?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
+      records.push({ id: resolve(skillPath), name, description: front.description, skillPath: resolve(skillPath), skillDirectory: dirname(skillPath), rootPath: root.path, relativePath: relative(root.path, dirname(skillPath)), scope: root.scope, sourceKind: root.sourceKind, plugin, metadata, content, supportingEntries: await tree(dirname(skillPath), dirname(skillPath)), state: { global: "default", workspace: "default", pluginEnabled: plugin?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
     }
   }
   const referenced = [...globalOverrides, ...workspaceOverrides].map((override) => override.path).filter((path) => !records.some((record) => record.skillPath === resolve(path)));
   for (const path of referenced) if (await fileExists(path)) {
     const content = await readFile(path, "utf8"); const front = frontmatter(content); const itemDiagnostics: Diagnostic[] = []; const metadata = await metadataFor(dirname(path), itemDiagnostics); const name = metadata?.name ?? front.name ?? basename(dirname(path));
-    records.push({ id: resolve(path), name, description: metadata?.shortDescription ?? front.description, skillPath: resolve(path), skillDirectory: dirname(path), rootPath: dirname(path), relativePath: basename(dirname(path)), scope: roots.workspaceRoot && resolve(path).startsWith(roots.workspaceRoot) ? "workspace" : "global", sourceKind: "config", plugin: pluginForPath(path, pluginCatalog.plugins), metadata, content, supportingEntries: await tree(dirname(path), dirname(path)), state: { global: "default", workspace: "default", pluginEnabled: pluginForPath(path, pluginCatalog.plugins)?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
+    records.push({ id: resolve(path), name, description: front.description, skillPath: resolve(path), skillDirectory: dirname(path), rootPath: dirname(path), relativePath: basename(dirname(path)), scope: roots.workspaceRoot && resolve(path).startsWith(roots.workspaceRoot) ? "workspace" : "global", sourceKind: "config", plugin: pluginForPath(path, pluginCatalog.plugins), metadata, content, supportingEntries: await tree(dirname(path), dirname(path)), state: { global: "default", workspace: "default", pluginEnabled: pluginForPath(path, pluginCatalog.plugins)?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
   }
   const precedence = (record: SkillRecord) => record.scope === "workspace" ? 0 : record.sourceKind === "user" ? 1 : record.sourceKind === "config" ? 2 : 3;
   for (const record of records) {

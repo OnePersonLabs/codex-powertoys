@@ -1,6 +1,8 @@
 export type ExpansionNode = {
   id: string;
-  skillRelated: boolean;
+  nestedResource?: boolean;
+  /** @deprecated Use nestedResource. Kept for existing callers. */
+  skillRelated?: boolean;
 };
 
 export type ExpansionAction =
@@ -13,7 +15,7 @@ type ExpansionMode = "default" | ExpansionAction | "manual";
 export class ResourceExpansionState {
   private readonly nodes = new Map<string, ExpansionNode>();
   private readonly states = new Map<string, boolean>();
-  private potentialSkillCount = 0;
+  private potentialNestedCount = 0;
   private mode: ExpansionMode = "default";
 
   register(node: ExpansionNode): boolean {
@@ -23,8 +25,12 @@ export class ResourceExpansionState {
     return this.states.get(node.id)!;
   }
 
+  setPotentialNestedCount(count: number): void {
+    this.potentialNestedCount = Math.max(0, count);
+  }
+
   setPotentialSkillCount(count: number): void {
-    this.potentialSkillCount = Math.max(0, count);
+    this.setPotentialNestedCount(count);
   }
 
   setNodeExpanded(node: ExpansionNode, expanded: boolean): void {
@@ -39,15 +45,15 @@ export class ResourceExpansionState {
 
   toolbarAction(): ExpansionAction {
     const nodes = [...this.nodes.values()];
-    const nonSkills = nodes.filter((node) => !node.skillRelated);
-    const skills = nodes.filter((node) => node.skillRelated);
-    const allNonSkillsExpanded = nonSkills.every((node) => this.isExpanded(node));
-    const allSkillsExpanded =
-      this.potentialSkillCount <= skills.length &&
-      skills.every((node) => this.isExpanded(node));
-    if (!allNonSkillsExpanded) return "expandNonSkills";
-    if (this.potentialSkillCount > 0 || skills.length > 0) {
-      if (!allSkillsExpanded) return "expandAll";
+    const nonNested = nodes.filter((node) => !this.isNestedResource(node));
+    const nested = nodes.filter((node) => this.isNestedResource(node));
+    const allNonNestedExpanded = nonNested.every((node) => this.isExpanded(node));
+    const allNestedExpanded =
+      this.potentialNestedCount <= nested.length &&
+      nested.every((node) => this.isExpanded(node));
+    if (!allNonNestedExpanded) return "expandNonSkills";
+    if (this.potentialNestedCount > 0 || nested.length > 0) {
+      if (!allNestedExpanded) return "expandAll";
     }
     return "collapseAll";
   }
@@ -61,7 +67,7 @@ export class ResourceExpansionState {
     for (const node of this.nodes.values()) {
       if (action === "collapseAll") this.states.set(node.id, false);
       else if (action === "expandNonSkills") {
-        if (!node.skillRelated) this.states.set(node.id, true);
+        if (!this.isNestedResource(node)) this.states.set(node.id, true);
       } else this.states.set(node.id, true);
     }
   }
@@ -79,7 +85,11 @@ export class ResourceExpansionState {
   private defaultExpanded(node: ExpansionNode): boolean {
     if (this.mode === "collapseAll") return false;
     if (this.mode === "expandAll") return true;
-    if (this.mode === "expandNonSkills") return !node.skillRelated;
-    return !node.skillRelated;
+    if (this.mode === "expandNonSkills") return !this.isNestedResource(node);
+    return !this.isNestedResource(node);
+  }
+
+  private isNestedResource(node: ExpansionNode): boolean {
+    return node.nestedResource ?? node.skillRelated ?? false;
   }
 }

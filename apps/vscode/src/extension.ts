@@ -7,15 +7,21 @@ import {
   ResourceExpansionState,
   type ExpansionAction,
 } from "./resource-expansion.js";
+import { McpToolCache, type McpToolCacheEntry } from "./mcp-tool-cache.js";
 import { visibleGroupKinds } from "./resource-groups.js";
 import { tooltipPath } from "./resource-path.js";
+import {
+  mcpToolTooltip,
+  mcpTooltip,
+  rootTooltip,
+  skillTooltip,
+} from "./resource-tooltip.js";
 import {
   discoverAgents,
   discoverMcps,
   discoverPlugins,
   discoverSkills,
   deleteResource,
-  loadMcpTools,
   renameAgent,
   renameMcpAcrossScopes,
   renameSkill,
@@ -62,6 +68,7 @@ type Node = {
   groupKind?: GroupKind;
   parentPlugin?: PluginRecord;
   underSkill?: boolean;
+  underMcp?: boolean;
 };
 
 type ClipboardState = {
@@ -81,7 +88,9 @@ function pluginManifestPath(plugin: PluginRecord): string {
 function scopeLabel(scope: Scope): string {
   return scope === "global" ? "Global" : "Workspace";
 }
-const TYPE_ICONS = { plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "🧠" } as const;
+const TYPE_ICONS = { plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪" } as const;
+const TOOL_PERMISSION_GLYPHS = ["✅", "❌", "✋"] as const;
+type ToolPermissionGlyph = (typeof TOOL_PERMISSION_GLYPHS)[number];
 
 function statusGlyph(value: SkillRecord | McpRecord | PluginRecord): string {
   if ("state" in value) return value.state.glyph;
@@ -175,11 +184,38 @@ function nodePath(node: Node | undefined): string | undefined {
 }
 
 function nodeKey(node: Node): string {
-  return `${node.kind}:${node.plugin?.id ?? node.skill?.id ?? node.mcp?.id ?? node.tool?.name ?? node.agent?.id ?? node.targetPath ?? node.entry?.path ?? node.label}`;
+  const toolKey = node.tool
+    ? `${node.toolParent?.id ?? node.toolParent?.name ?? "mcp"}:${node.tool.name}`
+    : undefined;
+  return `${node.kind}:${node.plugin?.id ?? node.skill?.id ?? node.mcp?.id ?? toolKey ?? node.agent?.id ?? node.targetPath ?? node.entry?.path ?? node.label}`;
 }
 
-function nodeIsSkillRelated(node: Node): boolean {
-  return node.kind === "skill" || Boolean(node.underSkill);
+function nodeIsNestedResource(node: Node): boolean {
+  return (
+    node.kind === "skill" ||
+    node.kind === "mcp" ||
+    node.kind === "mcpTool" ||
+    Boolean(node.underSkill) ||
+    Boolean(node.underMcp)
+  );
+}
+
+function toolPermissionGlyph(tool: McpTool): ToolPermissionGlyph {
+  const glyph = (tool as McpTool & { permissionGlyph?: string }).permissionGlyph;
+  return TOOL_PERMISSION_GLYPHS.includes(glyph as ToolPermissionGlyph)
+    ? (glyph as ToolPermissionGlyph)
+    : "✋";
+}
+
+function mcpToolNode(tool: McpTool, mcp: McpRecord): Node {
+  return {
+    kind: "mcpTool",
+    label: `${toolPermissionGlyph(tool)} ${TYPE_ICONS.tool} ${tool.name}`,
+    scope: mcp.scope,
+    tool,
+    toolParent: mcp,
+    underMcp: true,
+  };
 }
 
 function nodeIsExpandable(
@@ -233,9 +269,11 @@ function createTreeItem(
   item.id = nodeKey(node);
   item.contextValue = nodeContextValue(node);
   const path = nodePath(node);
-  if (path) item.tooltip = tooltipPath(path, node.scope, workspaceRoot());
+  if (node.kind === "root") item.tooltip = rootTooltip(path);
+  else if (path)
+    item.tooltip = `Path: ${tooltipPath(path, node.scope, workspaceRoot())}`;
   if (node.skill) {
-    item.tooltip = `${tooltipPath(node.skill.skillPath, node.scope, workspaceRoot())}\n${node.skill.description ?? ""}\n${node.skill.state.effective}`;
+    item.tooltip = skillTooltip(node.skill, workspaceRoot());
     item.command = {
       command: "codexPowerToys.openSkill",
       title: "Open Skill",
@@ -243,7 +281,7 @@ function createTreeItem(
     };
   }
   if (node.mcp) {
-    item.tooltip = `${tooltipPath(node.mcp.configPath, node.scope, workspaceRoot())}:${node.mcp.sourceRange.startLine + 1}\n${node.mcp.effective}${node.mcp.plugin ? `\nPlugin: ${node.mcp.plugin.name}` : ""}`;
+    item.tooltip = mcpTooltip(node.mcp, workspaceRoot());
     item.command = {
       command: "codexPowerToys.showMcp",
       title: "Show MCP",
@@ -259,7 +297,7 @@ function createTreeItem(
     };
   }
   if (node.tool && node.toolParent) {
-    item.tooltip = `${tooltipPath(node.toolParent.configPath, node.toolParent.scope, workspaceRoot())}\n${node.tool.description ?? "No description"}`;
+    item.tooltip = mcpToolTooltip(node.tool, node.toolParent, workspaceRoot());
     item.command = {
       command: "codexPowerToys.showMcpTool",
       title: "Show MCP Tool",
@@ -267,7 +305,7 @@ function createTreeItem(
     };
   }
   if (node.agent) {
-    item.tooltip = `${tooltipPath(node.agent.path, node.agent.scope, workspaceRoot())}\n${node.agent.relativePath}`;
+    item.tooltip = `Path: ${tooltipPath(node.agent.path, node.agent.scope, workspaceRoot())}\nRelative Path: ${node.agent.relativePath}`;
     item.command = {
       command: "codexPowerToys.openFile",
       title: "Open Agent",
@@ -358,7 +396,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   setNodeExpanded(node: Node, expanded: boolean): void {
     if (!nodeIsExpandable(node, this.showSupporting, true)) return;
     this.expansion.setNodeExpanded(
-      { id: nodeKey(node), skillRelated: nodeIsSkillRelated(node) },
+      { id: nodeKey(node), nestedResource: nodeIsNestedResource(node) },
       expanded,
     );
   }
@@ -383,12 +421,16 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     this.tools.set(mcp.id, tools);
     this.emitter.fire(undefined);
   }
+  syncCachedTools(cache: McpToolCache): void {
+    for (const mcp of this.mcps) this.tools.set(mcp.id, cache.toolsFor(mcp));
+    this.emitter.fire(undefined);
+  }
 
   getTreeItem(node: Node): vscode.TreeItem {
     const expanded = nodeIsExpandable(node, this.showSupporting, true)
       ? this.expansion.register({
           id: nodeKey(node),
-          skillRelated: nodeIsSkillRelated(node),
+          nestedResource: nodeIsNestedResource(node),
         })
       : true;
     return createTreeItem(node, expanded, this.showSupporting, true);
@@ -399,13 +441,13 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
       return [
         {
           kind: "root",
-          label: "Global — ~/",
+          label: "Global",
           scope: "global",
           targetPath: homedir(),
         },
         {
           kind: "root",
-          label: `Workspace — ${this.roots?.workspaceRoot ?? "(no workspace)"}`,
+          label: "Workspace",
           scope: "workspace",
           targetPath: this.roots?.workspaceRoot,
         },
@@ -415,13 +457,9 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     if (node.kind === "group") return this.groupChildren(node);
     if (node.kind === "plugin" && node.plugin) return this.pluginGroups(node.plugin);
     if (node.kind === "mcp" && node.mcp)
-      return (this.tools.get(node.mcp.id) ?? []).map((tool) => ({
-        kind: "mcpTool",
-        label: `${TYPE_ICONS.tool} ${tool.name}`,
-        scope: node.mcp!.scope,
-        tool,
-        toolParent: node.mcp,
-      }));
+      return (this.tools.get(node.mcp.id) ?? []).map((tool) =>
+        mcpToolNode(tool, node.mcp!),
+      );
     if (node.kind === "skill" && node.skill && this.showSupporting)
       return node.skill.supportingEntries.map((entry): Node => ({
         kind: "entry",
@@ -475,11 +513,17 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   }
 
   private updatePotentialSkillCount(): void {
-    this.expansion.setPotentialSkillCount(
-      this.showSupporting
-        ? this.skills.filter((skill) => this.matches(skill.name, skill.skillPath)).length
-        : 0,
-    );
+    const skills = this.showSupporting
+      ? this.skills.filter(
+          (skill) =>
+            skill.supportingEntries.length > 0 &&
+            this.matches(skill.name, skill.skillPath),
+        ).length
+      : 0;
+    const mcps = this.mcps.filter((mcp) =>
+      this.matches(mcp.name, mcp.configPath),
+    ).length;
+    this.expansion.setPotentialNestedCount(skills + mcps);
   }
 
   private groupPath(scope: Scope, kind: GroupKind, plugin?: PluginRecord): string | undefined {
@@ -579,9 +623,11 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
   readonly onDidChangeTreeData = this.emitter.event;
   mcps: McpRecord[] = [];
   filter = "";
+  private readonly expansion = new ResourceExpansionState();
   private readonly tools = new Map<string, McpTool[]>();
   async refresh(): Promise<void> {
     this.mcps = (await discoverMcps(coreOptions())).mcps;
+    this.expansion.reset();
     this.tools.clear();
     this.emitter.fire(undefined);
   }
@@ -593,8 +639,25 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
     this.tools.set(mcp.id, tools);
     this.emitter.fire(undefined);
   }
+  syncCachedTools(cache: McpToolCache): void {
+    for (const mcp of this.mcps) this.tools.set(mcp.id, cache.toolsFor(mcp));
+    this.emitter.fire(undefined);
+  }
+  setNodeExpanded(node: Node, expanded: boolean): void {
+    if (!nodeIsExpandable(node, false, false)) return;
+    this.expansion.setNodeExpanded(
+      { id: nodeKey(node), nestedResource: nodeIsNestedResource(node) },
+      expanded,
+    );
+  }
   getTreeItem(node: Node): vscode.TreeItem {
-    return createTreeItem(node, true, false, false);
+    const expanded = nodeIsExpandable(node, false, false)
+      ? this.expansion.register({
+          id: nodeKey(node),
+          nestedResource: nodeIsNestedResource(node),
+        })
+      : true;
+    return createTreeItem(node, expanded, false, false);
   }
   getChildren(node?: Node): Node[] {
     if (!node) {
@@ -604,13 +667,9 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
         .map(mcpNode);
     }
     if (node.kind === "mcp" && node.mcp)
-      return (this.tools.get(node.mcp.id) ?? []).map((tool) => ({
-        kind: "mcpTool",
-        label: `${TYPE_ICONS.tool} ${tool.name}`,
-        scope: node.mcp!.scope,
-        tool,
-        toolParent: node.mcp,
-      }));
+      return (this.tools.get(node.mcp.id) ?? []).map((tool) =>
+        mcpToolNode(tool, node.mcp!),
+      );
     return [];
   }
 }
@@ -717,6 +776,10 @@ class InfoView implements vscode.WebviewViewProvider {
   setTools(tools: Array<{ name: string; description?: string }>): void {
     this.tools = tools;
     this.render();
+  }
+  setToolsFor(mcp: McpRecord, tools: McpTool[]): void {
+    if (this.selected?.id !== mcp.id) return;
+    this.setTools(tools);
   }
   toggleExpandAll(): void {
     this.expandAll = !this.expandAll;
@@ -825,8 +888,33 @@ export function activate(context: vscode.ExtensionContext): void {
   const resources = new ResourcesProvider();
   const skills = new FlatSkillsProvider();
   const mcps = new FlatMcpProvider();
-  const agents = new AgentsProvider();
   const info = new InfoView();
+  let mcpToolCache: McpToolCache;
+  mcpToolCache = new McpToolCache((entry: McpToolCacheEntry) => {
+    const records = [
+      ...resources.mcps.filter(
+        (mcp) => mcp.name === entry.name && mcp.id === entry.recordId,
+      ),
+      ...mcps.mcps.filter(
+        (mcp) => mcp.name === entry.name && mcp.id === entry.recordId,
+      ),
+    ];
+    for (const mcp of records) {
+      if (mcp.effective !== "active" || !mcp.enabled || !mcp.pluginEnabled)
+        continue;
+      if (mcpToolCache.get(mcp)?.generation !== entry.generation) continue;
+      mcp.diagnostics = [
+        ...mcp.diagnostics.filter(
+          (diagnostic) => diagnostic.code !== "MCP_TOOLS_UNAVAILABLE",
+        ),
+        ...entry.diagnostics,
+      ];
+      resources.setTools(mcp, entry.tools);
+      mcps.setTools(mcp, entry.tools);
+      info.setToolsFor(mcp, entry.tools);
+    }
+  });
+  const agents = new AgentsProvider();
   let clipboard: ClipboardState | undefined;
   let lastTarget: Node | undefined;
   let activeSelection: readonly Node[] = [];
@@ -920,8 +1008,11 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand("setContext", "resourceDisabled", enabled === false),
     ]);
   };
-  const refreshAll = async () => {
+  const refreshAll = async (forceMcpNames: ReadonlySet<string> = new Set()) => {
     await refresh();
+    resources.syncCachedTools(mcpToolCache);
+    mcps.syncCachedTools(mcpToolCache);
+    mcpToolCache.enqueueEnabled(resources.mcps, forceMcpNames);
     await Promise.all([syncExpansionContexts(), syncResourceStateContext()]);
   };
   const inputBoxes = new Map<string, vscode.InputBox>();
@@ -1122,7 +1213,7 @@ export function activate(context: vscode.ExtensionContext): void {
       mcp.name,
       JSON.parse(raw),
     );
-    await refreshAll();
+    await refreshAll(new Set([mcp.name]));
   });
   command("codexPowerToys.mcp.delete", async (mcp: McpRecord) => {
     if (mcp.readOnly)
@@ -1135,13 +1226,11 @@ export function activate(context: vscode.ExtensionContext): void {
     await refreshAll();
   });
   command("codexPowerToys.mcp.loadTools", async (mcp: McpRecord) => {
-    const result = await loadMcpTools(mcp);
-    resources.setTools(mcp, result.tools);
-    mcps.setTools(mcp, result.tools);
     info.show(mcp);
-    info.setTools(result.tools);
-    if (result.diagnostics.length)
-      vscode.window.showWarningMessage(result.diagnostics[0]!.message);
+    if (!mcpToolCache.enqueue(mcp, true))
+      vscode.window.showWarningMessage(
+        "Only effective enabled MCPs can be queried for tools.",
+      );
   });
   command("codexPowerToys.showMcpTool", (tool: McpTool, mcp: McpRecord) =>
     info.showTool(tool, mcp),
@@ -1156,11 +1245,11 @@ export function activate(context: vscode.ExtensionContext): void {
     command(`codexPowerToys.mcp.${name}`, async (mcp: McpRecord) => {
       if (mcp.readOnly) return;
       await setMcpState(coreOptions(), scope, mcp.name, enabled);
-      await refreshAll();
+      await refreshAll(enabled ? new Set([mcp.name]) : new Set());
     });
   command("codexPowerToys.plugin.enable", async (plugin: PluginRecord) => {
     await setPluginEnabled(coreOptions(), plugin, true, plugin.scope);
-    await refreshAll();
+    await refreshAll(new Set(plugin.mcpNames));
   });
   command("codexPowerToys.plugin.disable", async (plugin: PluginRecord) => {
     await setPluginEnabled(coreOptions(), plugin, false, plugin.scope);
@@ -1316,6 +1405,12 @@ export function activate(context: vscode.ExtensionContext): void {
     resourceView.onDidCollapseElement((event) => {
       resources.setNodeExpanded(event.element, false);
       void setExpansionContext("resources", resources.shouldShowCollapse());
+    }),
+    mcpView.onDidExpandElement((event) => {
+      mcps.setNodeExpanded(event.element, true);
+    }),
+    mcpView.onDidCollapseElement((event) => {
+      mcps.setNodeExpanded(event.element, false);
     }),
   );
   void syncExpansionContexts();

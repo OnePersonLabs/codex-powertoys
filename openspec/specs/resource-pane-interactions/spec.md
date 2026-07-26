@@ -5,7 +5,7 @@ Define the dedicated resource panes and shared filtering, expansion, path-copy, 
 ## Requirements
 
 ### Requirement: Dedicated flat resource panes
-The extension SHALL expose dedicated Skills and MCP native TreeViews in addition to Resources and Agents. Skills and MCP panes SHALL show all discovered records for their type as flat, alphabetical lists, including plugin-owned records, and SHALL retain full selection, source-opening, enablement, inspection, tool-loading, and context-menu behavior applicable to the record.
+The extension SHALL expose dedicated Skills and MCP native TreeViews in addition to Resources and Agents. Skills and MCP panes SHALL show all discovered records for their type as flat, alphabetical lists, including plugin-owned records, and SHALL retain full selection, source-opening, enablement, inspection, tool-loading, and context-menu behavior applicable to the record. Enabled MCP rows SHALL expose cached tools as collapsed children using the same shared renderer as Resources.
 
 #### Scenario: Skills list
 - **WHEN** the Skills view is opened
@@ -13,11 +13,11 @@ The extension SHALL expose dedicated Skills and MCP native TreeViews in addition
 
 #### Scenario: MCP list
 - **WHEN** the MCP view is opened
-- **THEN** it shows a flat alphabetically ordered list of discovered MCPs with status and type icons, without plugin or config hierarchy rows
+- **THEN** it shows a flat alphabetically ordered list of discovered MCPs with status and type icons, with cached tools as collapsed children when available and without plugin or config hierarchy rows
 
 #### Scenario: Pane item interaction
 - **WHEN** a user selects or right-clicks a skill or MCP in its dedicated pane
-- **THEN** the existing Info/source-opening, enable/disable/reset, edit/delete, explicit tool-loading, copy, move, rename, and delete actions remain available subject to the same plugin read-only protections
+- **THEN** the existing Info/source-opening, enable/disable/reset, edit/delete, explicit re-query, copy, move, rename, and delete actions remain available subject to the same plugin read-only protections
 
 ### Requirement: Incremental pane filtering
 Resources, Skills, and MCP panes SHALL provide a toolbar filter input that applies case-insensitive matching to visible names and full canonical paths as the user types. Each pane SHALL provide an X/clear action while a filter is active, and clearing SHALL restore all records.
@@ -31,23 +31,23 @@ Resources, Skills, and MCP panes SHALL provide a toolbar filter input that appli
 - **THEN** the input and provider filter become empty and all records are visible again
 
 ### Requirement: Stateful tree expansion controls
-Resources SHALL use a per-node expansion state. On initial materialization, roots, groups, plugins, MCP containers, and ordinary supporting directories SHALL be expanded, while individual skill nodes and their supporting entries SHALL be collapsed. Resources SHALL expose a title action whose label and behavior reflect the current state; Agents SHALL retain their existing expansion controls.
+Resources SHALL use a per-node expansion state. On initial materialization, roots, groups, plugins, and ordinary supporting directories SHALL be expanded, while individual skill nodes, individual MCP nodes, and their supporting/tool entries SHALL be collapsed. Resources SHALL expose a title action whose label and behavior reflect the current state; Agents SHALL retain their existing expansion controls.
 
 #### Scenario: Skill-specific default expansion
 - **WHEN** Resources is first opened or refreshed
-- **THEN** non-skill containers are expanded, individual skill nodes are collapsed, and supporting directories/files remain hidden until a skill is expanded
+- **THEN** non-skill/non-MCP containers are expanded, individual skill and MCP nodes are collapsed, and supporting directories/files or MCP tools remain hidden until their parent is expanded
 
 #### Scenario: Collapse when every node is expanded
-- **WHEN** every known expandable Resources node, including skills, is expanded
+- **WHEN** every known expandable Resources node, including skills and MCPs, is expanded
 - **THEN** the title action is Collapse All and invoking it collapses every expandable node
 
 #### Scenario: Expand non-skills from a collapsed or mixed tree
-- **WHEN** any non-skill Resources node is collapsed
-- **THEN** the title action is Expand and invoking it expands all non-skill nodes while leaving individual skill nodes and their supporting entries unchanged
+- **WHEN** any non-skill/non-MCP Resources node is collapsed
+- **THEN** the title action is Expand and invoking it expands all non-skill/non-MCP nodes while leaving individual skill and MCP nodes and their nested entries unchanged
 
 #### Scenario: Expand skills after non-skills are already expanded
-- **WHEN** all non-skill Resources nodes are expanded but one or more individual skill nodes are collapsed
-- **THEN** the title action is Expand and invoking it expands all known nodes, including individual skills and their supporting entries
+- **WHEN** all non-skill/non-MCP Resources nodes are expanded but one or more individual skills or MCPs are collapsed
+- **THEN** the title action is Expand and invoking it expands all known nodes, including individual skills, MCPs, and their nested entries
 
 ### Requirement: Copy full and workspace-relative paths
 Every item in Resources, Skills, MCPs, and Agents SHALL offer `Copy Full Path` and `Copy Relative Path` context actions. Full path copies the canonical source path. Relative path copies the path relative to the active workspace root using `/` separators; when no workspace is open it SHALL copy the full path.
@@ -65,11 +65,12 @@ Every item in Resources, Skills, MCPs, and Agents SHALL offer `Copy Full Path` a
 - **THEN** the full canonical path is written to the clipboard
 
 ### Requirement: Source-aware path tooltips
-All resource and agent items in every tree pane SHALL expose their source path in the hover tooltip, including plugin-owned resources and loaded MCP tools. Workspace-scoped items SHALL show a path relative to the active workspace when their source is inside it; global-scoped items and workspace-scoped sources outside the active workspace SHALL show their canonical absolute path. Plugin nodes SHALL identify the plugin by name.
+All resource and agent items in every tree pane SHALL expose field-labelled hover tooltips, including plugin-owned resources and loaded MCP tools. Workspace-scoped items SHALL show a path relative to the active workspace when their source is inside it; global-scoped items and workspace-scoped sources outside the active workspace SHALL show their canonical absolute path. Plugin nodes SHALL identify the plugin by name and description when available. MCPs SHALL show their description below existing details; tools SHALL show `Tool` followed immediately by `Description`; skills SHALL show their description, then `Display Name`, `Short Description`, and `Default Prompt` metadata from `agents/openai.yml`/`openai.yaml` when present.
 
 #### Scenario: Workspace item tooltip
 - **WHEN** the user hovers a workspace-scoped resource, supporting entry, agent, or loaded MCP tool
 - **THEN** its tooltip contains the source path relative to the active workspace using `/` separators
+- **AND** each tooltip line uses `<fieldname>: <value>` format
 
 #### Scenario: Global item tooltip
 - **WHEN** the user hovers a global-scoped resource or plugin
@@ -78,6 +79,10 @@ All resource and agent items in every tree pane SHALL expose their source path i
 #### Scenario: Plugin tooltip identity
 - **WHEN** the user hovers a plugin node
 - **THEN** the tooltip identifies the plugin by name and includes its scope-aware root path
+
+#### Scenario: MCP and tool descriptions
+- **WHEN** the user hovers an MCP or cached MCP tool
+- **THEN** the tooltip includes a labelled MCP/tool description, with the tool description immediately below `Tool: <name>`
 
 ### Requirement: Plugin manifest activation
 Plugin row activation and the Open Plugin Manifest context action SHALL open the plugin's `.codex-plugin/plugin.json` file using the discovered manifest path when available. If the manifest cannot be opened, the extension SHALL report the exact attempted path instead of silently doing nothing.

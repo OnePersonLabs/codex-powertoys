@@ -47,7 +47,7 @@ Resource rows SHALL use the status glyph followed by a stable type icon and the 
 
 #### Scenario: Typed resource labels
 - **WHEN** the tree renders a plugin, skill, MCP, or loaded MCP tool
-- **THEN** its label uses `🔌` for plugins, `🧠` for skills, `🧰` for MCPs, and `🔨` for MCP tools after the current status glyph where a status exists
+- **THEN** its label uses `🔌` for plugins, `💪` for skills, `🧰` for MCPs, and the effective permission glyph (`✅`, `❌`, or `✋`) followed by `🔨` for MCP tools after the current status glyph where a status exists
 
 #### Scenario: Effective status remains visible
 - **WHEN** a resource is active, shadowed, unavailable, or disabled
@@ -58,19 +58,26 @@ Resource rows SHALL use the status glyph followed by a stable type icon and the 
 - **THEN** the row does not set `TreeItem.checkboxState`, and enablement is performed through the existing context or toolbar commands
 
 ### Requirement: Explicit MCP tool children
-The unified tree SHALL show MCP tools only after explicit tool loading.
+The unified tree SHALL show cached MCP tools as collapsed children after the background MCP discovery queue probes an effective enabled MCP. Discovery SHALL not block tree materialization; a failed cache entry SHALL leave the MCP visible with a diagnostic and no authoritative tool children.
 
 #### Scenario: MCP tools are not loaded implicitly
-- **WHEN** an MCP is discovered or expanded before the user invokes Load MCP Tools
+- **WHEN** an MCP is disabled, unavailable, or shadowed
 - **THEN** no process is started, no network request is made, and no tool children are displayed
 
 #### Scenario: Loaded tools are nested under their MCP
-- **WHEN** Load MCP Tools succeeds for a selected MCP
-- **THEN** the returned tools appear as `🔨` children under that MCP and remain selectable for inspection
+- **WHEN** the background probe or an explicit Load MCP Tools re-query succeeds for an effective MCP
+- **THEN** the returned tools appear as permission-glyph-prefixed `🔨` children under that MCP in both MCP-capable panes and remain selectable for inspection
 
 #### Scenario: Tool loading failure
-- **WHEN** explicit tool loading fails
+- **WHEN** a background or explicit tool probe fails
 - **THEN** the MCP remains visible with its static configuration and a visible diagnostic, and no partial tool list is presented as authoritative
+
+### Requirement: Unified scope root labels
+Resources SHALL label its two scope roots exactly `Global` and `Workspace`, with each root's full canonical path available in a field-labelled tooltip.
+
+#### Scenario: Concise scope roots
+- **WHEN** the Resources view is opened
+- **THEN** the top-level rows are labelled `Global` and `Workspace`, and hovering either row reveals its full root path
 
 ### Requirement: Preserve unified-tree interactions
 The unified view SHALL preserve applicable selection, inspection, mutation, transfer, and refresh behavior from the existing resource views.

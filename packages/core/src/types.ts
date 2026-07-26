@@ -1,5 +1,3 @@
-import type { ChildProcess } from "node:child_process";
-
 export type Scope = "global" | "workspace";
 export type SourceKind = "workspace" | "user" | "plugin" | "system" | "config" | "unknown";
 export type ResourceKind = "skill" | "mcp" | "agent";
@@ -157,12 +155,26 @@ export interface McpRecord {
   explicitEnabled?: boolean;
   sourceRange: SourceRange;
   diagnostics: Diagnostic[];
+  /** Effective policy used to annotate tools for display. */
+  toolPolicy?: McpToolPolicy;
+  /** Alias retained for callers that distinguish raw and merged policy. */
+  effectiveToolPolicy?: McpToolPolicy;
+}
+
+export type McpPermissionGlyph = "✅" | "❌" | "✋";
+
+export interface McpToolPolicy {
+  enabledTools?: string[];
+  disabledTools?: string[];
+  defaultApprovalMode?: string;
+  tools?: Record<string, { approvalMode?: string }>;
 }
 
 export interface McpTool {
   name: string;
   description?: string;
   inputSchema?: unknown;
+  permissionGlyph?: McpPermissionGlyph;
 }
 
 export interface McpToolResult {
