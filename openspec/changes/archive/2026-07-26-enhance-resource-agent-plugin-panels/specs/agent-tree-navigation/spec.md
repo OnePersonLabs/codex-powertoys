@@ -1,8 +1,4 @@
-## Purpose
-
-Define finite, correctly scoped navigation for global and workspace agent trees in the VS Code Agents view and Resources panel.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Render finite scoped agent trees
 The Resources Agents groups SHALL render global and workspace agent records as finite recursive trees whose directory children are calculated relative to the original scope root and the current directory's root-relative path. The dedicated Agents view SHALL flatten all discovered agent files across both scopes into one alphabetical list and SHALL not render scope-root nodes.
@@ -10,10 +6,6 @@ The Resources Agents groups SHALL render global and workspace agent records as f
 #### Scenario: Nested global agent directory
 - **WHEN** the global agents root contains `model-effort/sol-high.toml`
 - **THEN** the Global Agents group contains one `model-effort` directory and expanding it contains `sol-high.toml` as an agent file
-
-#### Scenario: Nested workspace agent directory
-- **WHEN** the workspace `.codex/agents` root contains `team/reviewer.toml`
-- **THEN** the Workspace Agents group contains one `team` directory and expanding it contains `reviewer.toml` as an agent file
 
 #### Scenario: Flattened dedicated agent list
 - **WHEN** global and workspace agent files are discovered
@@ -29,10 +21,6 @@ The Resources Agents groups SHALL initially enumerate only their scope root and 
 #### Scenario: View refresh with nested agents
 - **WHEN** Resources is refreshed and nested agents exist
 - **THEN** loading completes after enumerating the two scope roots and immediate children without recursively expanding every directory
-
-#### Scenario: User expands a directory
-- **WHEN** the user expands a nested agent directory in Resources
-- **THEN** the view returns only that directory's direct child directories and agent files, with no repeated self or ancestor nodes
 
 #### Scenario: No workspace is open
 - **WHEN** no workspace folder is available

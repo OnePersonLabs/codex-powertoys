@@ -31,8 +31,9 @@ test("extension manifest registers inspector views and commands", async () => {
   );
   assert.deepEqual(views, [
     "codexPowerToys.resources",
-    "codexPowerToys.skills",
+    "codexPowerToys.plugins",
     "codexPowerToys.mcps",
+    "codexPowerToys.skills",
     "codexPowerToys.agents",
     "codexPowerToys.info",
   ]);
@@ -61,16 +62,17 @@ test("extension manifest registers inspector views and commands", async () => {
     "codexPowerToys.resource.copyRelativePath",
     "codexPowerToys.resources.collapseAll",
     "codexPowerToys.resources.expandAll",
-    "codexPowerToys.agents.collapseAll",
-    "codexPowerToys.agents.expandAll",
   ])
     assert.ok(manifest.contributes.commands.some((item) => item.command === command));
+  assert.equal(manifest.contributes.commands.some((item) => item.command === "codexPowerToys.agents.collapseAll"), false);
   assert.match(source, /canSelectMany:\s*true/);
   assert.match(source, /createTreeView\("codexPowerToys.resources"/);
   assert.match(source, /createTreeView\("codexPowerToys.skills"/);
+  assert.match(source, /createTreeView\("codexPowerToys.plugins"/);
   assert.match(source, /createTreeView\("codexPowerToys.mcps"/);
   assert.doesNotMatch(source, /TreeItemCheckboxState|checkboxState/);
   assert.match(source, /🔌/);
+  assert.match(source, /🤖/);
   assert.match(source, /🧰/);
   assert.match(source, /🔨/);
   assert.match(source, /💪/);

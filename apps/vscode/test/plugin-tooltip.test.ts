@@ -8,12 +8,13 @@ const plugin = {
   scope: "workspace" as const,
   version: "1.2.3",
   enabled: true,
+  effective: "active" as const,
 };
 
 test("plugin tooltip identifies the plugin and uses a workspace-relative path", () => {
   assert.equal(
     pluginTooltip(plugin, "/workspace"),
-    "Plugin: Acme Tools\nPath: ./.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: enabled",
+    "Plugin: Acme Tools\nPath: ./.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: active",
   );
 });
 
@@ -23,7 +24,7 @@ test("plugin tooltip keeps global plugin paths canonical", () => {
       { ...plugin, scope: "global", root: "/home/user/.codex/plugins/acme-tools" },
       "/workspace",
     ),
-    "Plugin: Acme Tools\nPath: /home/user/.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: enabled",
+    "Plugin: Acme Tools\nPath: /home/user/.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: active",
   );
 });
 
@@ -33,6 +34,6 @@ test("plugin tooltip does not relativize a workspace plugin outside the active w
       { ...plugin, root: "/other-project/.codex/plugins/acme-tools" },
       "/workspace",
     ),
-    "Plugin: Acme Tools\nPath: /other-project/.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: enabled",
+    "Plugin: Acme Tools\nPath: /other-project/.codex/plugins/acme-tools\nVersion: 1.2.3\nStatus: active",
   );
 });

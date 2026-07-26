@@ -1,23 +1,27 @@
 ## Purpose
 
-Define the unified VS Code resource tree for Skills, Plugins, MCPs, and explicitly loaded MCP tools.
+Define the unified VS Code resource tree for Skills, Plugins, MCPs, Agents, and explicitly loaded MCP tools.
 
 ## Requirements
 
 ### Requirement: Unified scoped resource tree
-The extension SHALL expose Skills, Plugins, and MCPs through one native Resources TreeView with exactly two top-level scope roots: Global and Workspace. Each scope SHALL contain a `Plugins` group, SHALL contain an `MCPs` group only when at least one visible standalone MCP exists, and SHALL contain a `Skills` group only when at least one visible standalone skill exists. Standalone resources SHALL appear under their type group and plugin-owned resources SHALL appear beneath their owning plugin's corresponding non-empty type group.
+The extension SHALL expose Skills, Plugins, MCPs, and Agents through one native Resources TreeView with exactly two top-level scope roots: Global and Workspace. Each scope SHALL contain a `Plugins` group, SHALL contain an `MCPs` group only when at least one visible standalone MCP exists, SHALL contain a `Skills` group only when at least one visible standalone skill exists, and SHALL contain an `Agents` group when agent files are available. Standalone resources SHALL appear under their type group and plugin-owned resources SHALL appear beneath their owning plugin's corresponding non-empty type group.
 
 #### Scenario: Global and workspace roots
 - **WHEN** the Resources view is opened
 - **THEN** it contains a Global root representing `~/` and a Workspace root representing the active workspace, with no type roots above those scope roots
 
+#### Scenario: Agents groups
+- **WHEN** global or workspace agent files exist
+- **THEN** the corresponding scope contains an `Agents` group whose children mirror the recursive subdirectory structure under that scope's agents root
+
 #### Scenario: Non-empty type groups
 - **WHEN** a scope root is expanded
-- **THEN** it contains `Plugins` plus only the non-empty `MCPs` and `Skills` groups, and standalone MCPs and Skills are not mixed into the Plugins group
+- **THEN** it contains `Plugins` plus only the non-empty `MCPs`, `Skills`, and `Agents` groups, and standalone MCPs and Skills are not mixed into the Plugins group
 
 #### Scenario: Empty type groups are omitted
-- **WHEN** a scope has no visible standalone MCPs or Skills, or a plugin has no visible MCPs or Skills
-- **THEN** the corresponding empty `MCPs` or `Skills` group node is not shown
+- **WHEN** a scope has no visible standalone MCPs, Skills, or Agents, or a plugin has no visible MCPs or Skills
+- **THEN** the corresponding empty group node is not shown
 
 #### Scenario: Resources retain source provenance
 - **WHEN** resources are discovered from `~/.agents`, `~/.codex`, configured roots, workspace roots, or plugin subpaths
@@ -43,15 +47,15 @@ The unified tree SHALL represent plugin-owned resources according to the plugin 
 - **THEN** the existing read-only guards remain effective for edit, rename, delete, and move operations, while copy/export actions remain available where supported
 
 ### Requirement: Status and type icon labels
-Resource rows SHALL use the status glyph followed by a stable type icon and the resource name.
+Resource rows SHALL use the effective-state glyph followed by a stable type icon and the resource name. Plugins SHALL use 🔌, agents SHALL use 🤖, skills SHALL use 💪, MCPs SHALL use 🧰, and loaded MCP tools SHALL use 🔨 after their permission glyph.
 
 #### Scenario: Typed resource labels
-- **WHEN** the tree renders a plugin, skill, MCP, or loaded MCP tool
-- **THEN** its label uses `🔌` for plugins, `💪` for skills, `🧰` for MCPs, and the effective permission glyph (`✅`, `❌`, or `✋`) followed by `🔨` for MCP tools after the current status glyph where a status exists
+- **WHEN** the tree renders a plugin, skill, MCP, loaded MCP tool, or agent
+- **THEN** its label uses the corresponding stable type icon after the effective status or permission glyph where a status exists
 
 #### Scenario: Effective status remains visible
 - **WHEN** a resource is active, shadowed, unavailable, or disabled
-- **THEN** the existing status glyph (`✅`, `☑️`, `✖️`, or `❌`) reflects that effective state without requiring a native checkbox
+- **THEN** the shared precedence renders ✅, ☑️, ✖️, or ❌ without requiring a native checkbox
 
 #### Scenario: No native resource checkboxes
 - **WHEN** a resource row is rendered in the unified view
@@ -66,7 +70,7 @@ The unified tree SHALL show cached MCP tools as collapsed children after the bac
 
 #### Scenario: Loaded tools are nested under their MCP
 - **WHEN** the background probe or an explicit Load MCP Tools re-query succeeds for an effective MCP
-- **THEN** the returned tools appear as permission-glyph-prefixed `🔨` children under that MCP in both MCP-capable panes and remain selectable for inspection
+- **THEN** the returned tools appear as permission-glyph-prefixed 🔨 children under that MCP in both MCP-capable panes and remain selectable for inspection
 
 #### Scenario: Tool loading failure
 - **WHEN** a background or explicit tool probe fails
@@ -83,13 +87,16 @@ Resources SHALL label its two scope roots exactly `Global` and `Workspace`, with
 The unified view SHALL preserve applicable selection, inspection, mutation, transfer, and refresh behavior from the existing resource views.
 
 #### Scenario: Resource inspection
-- **WHEN** a skill, plugin, MCP, or loaded tool is selected
+- **WHEN** a skill, plugin, MCP, agent, or loaded tool is selected
 - **THEN** the existing Info surface or source-opening command receives the selected record and displays the relevant metadata/configuration/content
 
 #### Scenario: Resource mutation
 - **WHEN** a user invokes an enable, disable, reset, rename, delete, copy, move, or paste command for an eligible resource
 - **THEN** the existing core mutation is invoked with the same scope and read-only protections, and the unified tree refreshes to show the resulting status/path
 
-#### Scenario: Agents remain separate
+### Requirement: Agents remain separate
+The extension SHALL keep Agents in a dedicated flat provider while also exposing scoped recursive Agents groups in Resources.
+
+#### Scenario: Dedicated and scoped agent views
 - **WHEN** the extension exposes the Agents view
-- **THEN** Agents continue using their existing recursive Global/Workspace tree and are not duplicated into the unified resource view
+- **THEN** Agents continue using a dedicated provider, while Resources also exposes scoped Agents groups and recursive agent children without duplicating scope-root rows inside the dedicated provider

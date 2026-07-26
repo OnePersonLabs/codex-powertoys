@@ -35,8 +35,26 @@ test("discovers plugins and disables their skills and MCPs", async () => {
   const values = await fixture(); const plugins = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); const plugin = plugins.plugins.find((item) => item.name === "plugin"); assert.ok(plugin); assert.equal(plugin.enabled, false); assert.equal(plugin.skillPaths.length, 1); assert.deepEqual(plugin.mcpNames, ["pluginServer"]); const mcps = await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(mcps.mcps.find((item) => item.name === "pluginServer")?.effective, "unavailable"); const skills = await discoverSkills({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(skills.skills.find((item) => item.sourceKind === "plugin")?.state.effective, "unavailable"); await setPluginEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, plugin, true, "global"); assert.match(await readFile(join(values.codex, "config.toml"), "utf8"), /enabled = true/); await setPluginEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, plugin, undefined, "global"); assert.doesNotMatch(await readFile(join(values.codex, "config.toml"), "utf8"), /plugins\.\"plugin@source\"/);
 });
 
-test("discovers remote-install plugin metadata and declared MCP paths", async () => {
-  const values = await fixture(); const result = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); const remote = result.plugins.find((item) => item.name === "remote-plugin"); assert.equal(remote?.id, "remote-id"); assert.equal(result.plugins.find((item) => item.name === "plugin")?.mcpPath?.endsWith("plugin-mcp.json"), true);
+test("requires a Codex plugin manifest and preserves declared MCP paths", async () => {
+  const values = await fixture(); const result = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(result.plugins.find((item) => item.name === "remote-plugin"), undefined); assert.equal(result.plugins.find((item) => item.name === "plugin")?.mcpPath?.endsWith("plugin-mcp.json"), true);
+});
+
+test("deduplicates plugins by Codex manifest and marks superseded records", async () => {
+  const values = await fixture();
+  await writeFile(join(values.codex, "config.toml"), "[plugins.\"plugin@source\"]\nenabled = true\n");
+  const workspacePlugin = join(values.workspace, ".codex", "plugins", "plugin", "2.0.0");
+  await mkdir(join(workspacePlugin, ".codex-plugin"), { recursive: true });
+  await writeFile(join(workspacePlugin, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "plugin", version: "2.0.0" }));
+  await mkdir(join(values.codex, "plugins", "cache", "source", "claude-only", ".claude-plugin"), { recursive: true });
+  await writeFile(join(values.codex, "plugins", "cache", "source", "claude-only", ".claude-plugin", "plugin.json"), "{}");
+  const result = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace });
+  const plugins = result.plugins.filter((item) => item.name === "plugin");
+  assert.equal(plugins.length, 2);
+  assert.equal(plugins.filter((item) => item.effective === "active").length, 1);
+  assert.equal(plugins.filter((item) => item.effective === "shadowed").length, 1);
+  assert.ok(plugins.every((item) => item.manifestPath?.endsWith(".codex-plugin/plugin.json")));
+  const overlapping = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.home });
+  assert.equal(overlapping.plugins.filter((item) => item.name === "plugin").length, 1);
 });
 
 test("applies workspace-over-global plugin MCP policy overlays without changing transport config", async () => {

@@ -23,8 +23,8 @@ export async function discoverMcps(options: DiscoveryOptions = {}): Promise<{ ro
   }
   const precedence = (record: McpRecord) => record.scope === "workspace" ? 0 : record.sourceKind === "config" ? 1 : 2; const grouped = new Map<string, McpRecord[]>(); for (const record of mcps) (grouped.get(record.name) ?? (grouped.set(record.name, []), grouped.get(record.name)!)).push(record);
   for (const group of grouped.values()) {
-    const candidates = group.filter((record) => record.pluginEnabled && record.enabled).sort((a, b) => precedence(a) - precedence(b) || a.id.localeCompare(b.id)); const winner = candidates[0];
-    for (const record of group) { record.pluginEnabled = record.plugin?.enabled ?? true; record.disabledByPlugin = !record.pluginEnabled; if (!record.pluginEnabled) record.effective = "unavailable"; else if (!record.enabled) record.effective = "disabled"; else if (winner && winner !== record) { record.effective = "shadowed"; record.shadowedBy = winner.id; } else record.effective = "active"; }
+    const candidates = group.filter((record) => record.pluginEnabled && record.enabled && record.plugin?.effective !== "shadowed").sort((a, b) => precedence(a) - precedence(b) || a.id.localeCompare(b.id)); const winner = candidates[0];
+    for (const record of group) { record.pluginEnabled = record.plugin?.enabled ?? true; record.disabledByPlugin = !record.pluginEnabled; if (!record.pluginEnabled) record.effective = "unavailable"; else if (record.plugin?.effective === "shadowed") { record.effective = "shadowed"; record.shadowedBy = record.plugin.shadowedBy; } else if (!record.enabled) record.effective = "disabled"; else if (winner && winner !== record) { record.effective = "shadowed"; record.shadowedBy = winner.id; } else record.effective = "active"; }
   }
   return { roots, mcps: mcps.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope) || a.sourceKind.localeCompare(b.sourceKind)), diagnostics };
 }
