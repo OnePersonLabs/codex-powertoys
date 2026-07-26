@@ -42,7 +42,7 @@ test("resource groups and expansion state preserve skill-specific behavior", asy
 
 test("resource labels use status and type glyphs without native checkboxes", async () => {
   const source = await extensionSource();
-  assert.match(source, /const TYPE_ICONS = \{ plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪" \}/);
+  assert.match(source, /const TYPE_ICONS = \{ plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪", agent: "🤖" \}/);
   assert.match(source, /return `\$\{value \? `\$\{statusGlyph\(value\)\} ` : ""\}\$\{TYPE_ICONS\[type\]\}/);
   assert.doesNotMatch(source, /TreeItemCheckboxState|checkboxState|onDidChangeCheckboxState/);
 });
@@ -61,12 +61,12 @@ test("MCP tools are populated by the shared background cache", async () => {
 test("flat panes, filters, path actions, and expansion state are wired", async () => {
   const source = await extensionSource();
   assert.match(source, /class FlatSkillsProvider/);
+  assert.match(source, /class FlatPluginsProvider/);
   assert.match(source, /class FlatMcpProvider/);
   assert.match(source, /this\.skills[\s\S]*\.map\(skillNode\)/);
   assert.match(source, /this\.mcps[\s\S]*\.map\(mcpNode\)/);
   assert.match(source, /onDidChangeValue/);
   assert.match(source, /resource\.copyFullPath/);
   assert.match(source, /resource\.copyRelativePath/);
-  assert.match(source, /private expanded = true/);
   assert.match(source, /showCollapseAll: false/);
 });

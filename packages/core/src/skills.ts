@@ -63,7 +63,8 @@ export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ 
   const referenced = [...globalOverrides, ...workspaceOverrides].map((override) => override.path).filter((path) => !records.some((record) => record.skillPath === resolve(path)));
   for (const path of referenced) if (await fileExists(path)) {
     const content = await readFile(path, "utf8"); const front = frontmatter(content); const itemDiagnostics: Diagnostic[] = []; const metadata = await metadataFor(dirname(path), itemDiagnostics); const name = metadata?.name ?? front.name ?? basename(dirname(path));
-    records.push({ id: resolve(path), name, description: front.description, skillPath: resolve(path), skillDirectory: dirname(path), rootPath: dirname(path), relativePath: basename(dirname(path)), scope: roots.workspaceRoot && resolve(path).startsWith(roots.workspaceRoot) ? "workspace" : "global", sourceKind: "config", plugin: pluginForPath(path, pluginCatalog.plugins), metadata, content, supportingEntries: await tree(dirname(path), dirname(path)), state: { global: "default", workspace: "default", pluginEnabled: pluginForPath(path, pluginCatalog.plugins)?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
+    const plugin = pluginForPath(path, pluginCatalog.plugins);
+    records.push({ id: resolve(path), name, description: front.description, skillPath: resolve(path), skillDirectory: dirname(path), rootPath: dirname(path), relativePath: basename(dirname(path)), scope: roots.workspaceRoot && resolve(path).startsWith(roots.workspaceRoot) ? "workspace" : "global", sourceKind: "config", plugin, metadata, content, supportingEntries: await tree(dirname(path), dirname(path)), state: { global: "default", workspace: "default", pluginEnabled: plugin?.enabled ?? true, effective: "active", glyph: "✅" }, diagnostics: itemDiagnostics });
   }
   const precedence = (record: SkillRecord) => record.scope === "workspace" ? 0 : record.sourceKind === "user" ? 1 : record.sourceKind === "config" ? 2 : 3;
   for (const record of records) {
@@ -73,10 +74,11 @@ export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ 
   }
   const byName = new Map<string, SkillRecord[]>(); for (const record of records) (byName.get(record.name) ?? (byName.set(record.name, []), byName.get(record.name)!)).push(record);
   for (const group of byName.values()) {
-    const candidates = group.filter((record) => record.state.global !== "disabled" && record.state.workspace !== "disabled" && record.state.pluginEnabled).sort((a, b) => precedence(a) - precedence(b) || a.skillPath.localeCompare(b.skillPath));
+    const candidates = group.filter((record) => record.state.global !== "disabled" && record.state.workspace !== "disabled" && record.state.pluginEnabled && record.plugin?.effective !== "shadowed").sort((a, b) => precedence(a) - precedence(b) || a.skillPath.localeCompare(b.skillPath));
     const winner = candidates[0];
     for (const record of group) {
       if (!record.state.pluginEnabled) record.state.effective = "unavailable";
+      else if (record.plugin?.effective === "shadowed") { record.state.effective = "shadowed"; record.state.shadowedBy = record.plugin.shadowedBy; }
       else if (record.state.global === "disabled" || record.state.workspace === "disabled") record.state.effective = "disabled";
       else if (winner && winner !== record) { record.state.effective = "shadowed"; record.state.shadowedBy = winner.skillPath; }
       else record.state.effective = "active";

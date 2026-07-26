@@ -3,7 +3,7 @@ import { tooltipPath } from "./resource-path.js";
 
 export type PluginTooltipRecord = Pick<
   PluginRecord,
-  "name" | "root" | "scope" | "version" | "enabled" | "metadata"
+  "name" | "root" | "scope" | "version" | "enabled" | "effective" | "metadata"
 >;
 
 export function pluginTooltip(
@@ -15,7 +15,7 @@ export function pluginTooltip(
     `Path: ${tooltipPath(plugin.root, plugin.scope, workspaceRoot)}`,
   ];
   if (plugin.version) lines.push(`Version: ${plugin.version}`);
-  lines.push(`Status: ${plugin.enabled ? "enabled" : "disabled"}`);
+  lines.push(`Status: ${plugin.effective ?? (plugin.enabled ? "active" : "disabled")}`);
   const description =
     plugin.metadata && typeof plugin.metadata.description === "string"
       ? plugin.metadata.description

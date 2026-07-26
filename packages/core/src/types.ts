@@ -35,10 +35,16 @@ export interface PluginInfo {
   mcpPath?: string;
   readOnly?: boolean;
   metadata?: Record<string, unknown>;
+  effective?: EffectiveResourceState;
+  shadowedBy?: string;
+  glyph?: "✅" | "☑️" | "❌" | "✖️";
 }
 
 export interface PluginRecord extends PluginInfo {
   id: string;
+  effective: EffectiveResourceState;
+  shadowedBy?: string;
+  glyph: "✅" | "☑️" | "❌" | "✖️";
   diagnostics: Diagnostic[];
   sourceRange?: SourceRange;
   skillPaths: string[];

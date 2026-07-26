@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { homedir } from "node:os";
-import { basename, join, relative, sep } from "node:path";
+import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { agentTreeChildren } from "./agent-tree.js";
 import { pluginTooltip } from "./plugin-tooltip.js";
 import {
@@ -41,7 +41,7 @@ import {
 
 const RESOURCE_MIME = "application/vnd.codex-powertoys.resource";
 type Scope = "global" | "workspace";
-type GroupKind = "plugins" | "mcps" | "skills";
+type GroupKind = "plugins" | "mcps" | "skills" | "agents";
 type NodeKind =
   | "root"
   | "group"
@@ -88,19 +88,19 @@ function pluginManifestPath(plugin: PluginRecord): string {
 function scopeLabel(scope: Scope): string {
   return scope === "global" ? "Global" : "Workspace";
 }
-const TYPE_ICONS = { plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪" } as const;
+const TYPE_ICONS = { plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪", agent: "🤖" } as const;
 const TOOL_PERMISSION_GLYPHS = ["✅", "❌", "✋"] as const;
 type ToolPermissionGlyph = (typeof TOOL_PERMISSION_GLYPHS)[number];
 
 function statusGlyph(value: SkillRecord | McpRecord | PluginRecord): string {
-  if ("state" in value) return value.state.glyph;
-  if ("effective" in value)
-    return value.effective === "active"
-      ? "✅"
-      : value.effective === "shadowed"
-        ? "☑️"
-        : "❌";
-  return value.enabled ? "✅" : "❌";
+  const effective = "state" in value
+    ? value.state.effective
+    : value.effective;
+  if (effective === "active") return "✅";
+  if (effective === "shadowed") return "☑️";
+  if (value.scope === "workspace" && "enabled" in value && value.enabled === false) return "✖️";
+  if ("state" in value && value.state.workspace === "disabled" && value.state.global !== "disabled") return "✖️";
+  return "❌";
 }
 
 function typedLabel(
@@ -305,7 +305,15 @@ function createTreeItem(
     };
   }
   if (node.agent) {
-    item.tooltip = `Path: ${tooltipPath(node.agent.path, node.agent.scope, workspaceRoot())}\nRelative Path: ${node.agent.relativePath}`;
+    const homeRelative = relative(homedir(), node.agent.path);
+    const displayPath = node.agent.scope === "global"
+      ? !isAbsolute(homeRelative) && !homeRelative.startsWith("..")
+        ? `~/${homeRelative.split(sep).join("/")}`
+        : node.agent.path
+      : workspaceRoot()
+        ? relative(workspaceRoot()!, node.agent.path).split(sep).join("/")
+        : node.agent.relativePath.split(sep).join("/");
+    item.tooltip = `Path: ${displayPath}\n${node.agent.content}`;
     item.command = {
       command: "codexPowerToys.openFile",
       title: "Open Agent",
@@ -351,12 +359,23 @@ function pluginNode(plugin: PluginRecord): Node {
   };
 }
 
+function agentNode(agent: AgentRecord): Node {
+  return {
+    kind: "agent",
+    label: `${TYPE_ICONS.agent} ${agent.name}`,
+    scope: agent.scope,
+    targetPath: agent.path,
+    agent,
+  };
+}
+
 class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   readonly emitter = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this.emitter.event;
   skills: SkillRecord[] = [];
   mcps: McpRecord[] = [];
   plugins: PluginRecord[] = [];
+  agents: AgentRecord[] = [];
   roots?: RootSet;
   showSupporting = true;
   filter = "";
@@ -364,15 +383,17 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   private readonly tools = new Map<string, McpTool[]>();
 
   async refresh(): Promise<void> {
-    const [skills, plugins, mcps] = await Promise.all([
+    const [skills, plugins, mcps, agents] = await Promise.all([
       discoverSkills(coreOptions()),
       discoverPlugins(coreOptions()),
       discoverMcps(coreOptions()),
+      discoverAgents(coreOptions()),
     ]);
     this.roots = skills.roots;
     this.skills = skills.skills;
     this.plugins = plugins.plugins;
     this.mcps = mcps.mcps;
+    this.agents = agents.agents;
     this.expansion.reset();
     this.updatePotentialSkillCount();
     this.tools.clear();
@@ -476,6 +497,14 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
         entry,
         underSkill: node.underSkill,
       }));
+    if (node.kind === "agentDir" && node.scope && node.targetPath) {
+      const root = node.scope === "global" ? join(this.roots?.codexHome ?? homedir(), "agents") : this.roots?.workspaceRoot ? join(this.roots.workspaceRoot, ".codex", "agents") : undefined;
+      return agentTreeChildren(this.filteredAgents(node.scope), node.scope, root, node.relativePath).map((child): Node =>
+        child.kind === "directory"
+          ? { kind: "agentDir", label: child.name, scope: node.scope, targetPath: child.path, relativePath: child.relativePath }
+          : agentNode(child.agent),
+      );
+    }
     return [];
   }
 
@@ -499,6 +528,10 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
         (!plugin ? !mcp.plugin : mcp.plugin?.id === plugin.id) &&
         this.matches(mcp.name, mcp.configPath),
     );
+  }
+
+  private filteredAgents(scope: Scope): AgentRecord[] {
+    return this.agents.filter((agent) => agent.scope === scope && this.matches(agent.name, agent.path));
   }
 
   private filteredPlugins(scope: Scope): PluginRecord[] {
@@ -527,6 +560,9 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   }
 
   private groupPath(scope: Scope, kind: GroupKind, plugin?: PluginRecord): string | undefined {
+    if (kind === "agents") return scope === "global"
+      ? join(this.roots?.codexHome ?? homedir(), "agents")
+      : this.roots?.workspaceRoot ? join(this.roots.workspaceRoot, ".codex", "agents") : undefined;
     if (plugin) {
       if (kind === "skills") return join(plugin.root, "skills");
       if (kind === "mcps") return plugin.mcpPath ?? join(plugin.root, ".mcp.json");
@@ -552,7 +588,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   ): Node {
     return {
       kind: "group",
-      label: kind === "plugins" ? "Plugins" : kind === "mcps" ? "MCPs" : "Skills",
+      label: kind === "plugins" ? "Plugins" : kind === "mcps" ? "MCPs" : kind === "skills" ? "Skills" : "Agents",
       scope,
       targetPath: this.groupPath(scope, kind, plugin),
       groupKind: kind,
@@ -561,11 +597,13 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   }
 
   private scopeGroups(scope: Scope): Node[] {
-    return visibleGroupKinds({
+    const groups = visibleGroupKinds({
       plugins: true,
       mcps: this.filteredMcps(scope).length > 0,
       skills: this.filteredSkills(scope).length > 0,
     }).map((kind) => this.groupNode(scope, kind));
+    if (this.filteredAgents(scope).length > 0) groups.push(this.groupNode(scope, "agents"));
+    return groups;
   }
 
   private groupChildren(node: Node): Node[] {
@@ -580,6 +618,15 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
       return this.filteredPlugins(node.scope!).map(pluginNode);
     if (node.groupKind === "skills")
       return this.filteredSkills(node.scope).map(skillNode);
+    if (node.groupKind === "agents") {
+      const scope = node.scope!;
+      const root = scope === "global" ? join(this.roots?.codexHome ?? homedir(), "agents") : this.roots?.workspaceRoot ? join(this.roots.workspaceRoot, ".codex", "agents") : undefined;
+      return agentTreeChildren(this.filteredAgents(scope), scope, root).map((child): Node =>
+        child.kind === "directory"
+          ? { kind: "agentDir", label: child.name, scope, targetPath: child.path, relativePath: child.relativePath }
+          : agentNode(child.agent),
+      );
+    }
     return this.filteredMcps(node.scope).map(mcpNode);
   }
 
@@ -598,23 +645,140 @@ class FlatSkillsProvider implements vscode.TreeDataProvider<Node> {
   readonly onDidChangeTreeData = this.emitter.event;
   skills: SkillRecord[] = [];
   filter = "";
+  private readonly expansion = new ResourceExpansionState();
   async refresh(): Promise<void> {
     this.skills = (await discoverSkills(coreOptions())).skills;
+    this.expansion.reset();
     this.emitter.fire(undefined);
   }
   setFilter(value: string): void {
     this.filter = value;
+    this.expansion.resetMaterializedNodes();
     this.emitter.fire(undefined);
   }
+  setNodeExpanded(node: Node, expanded: boolean): void {
+    if (!nodeIsExpandable(node, true, true)) return;
+    this.expansion.setNodeExpanded({ id: nodeKey(node), nestedResource: true }, expanded);
+  }
   getTreeItem(node: Node): vscode.TreeItem {
-    return createTreeItem(node, true, false, false);
+    const expanded = nodeIsExpandable(node, true, true)
+      ? this.expansion.register({ id: nodeKey(node), nestedResource: true })
+      : true;
+    return createTreeItem(node, expanded, true, true);
   }
   getChildren(node?: Node): Node[] {
+    if (node?.kind === "skill" && node.skill)
+      return node.skill.supportingEntries.map((entry): Node => ({
+        kind: "entry",
+        label: entry.name,
+        scope: node.scope,
+        entry,
+        underSkill: true,
+      }));
+    if (node?.kind === "entry" && node.entry?.children)
+      return node.entry.children.map((entry): Node => ({
+        kind: "entry",
+        label: entry.name,
+        scope: node.scope,
+        entry,
+        underSkill: node.underSkill,
+      }));
     if (node) return [];
     const filter = this.filter.toLowerCase();
     return this.skills
       .filter((skill) => !filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter))
       .map(skillNode);
+  }
+}
+
+class FlatPluginsProvider implements vscode.TreeDataProvider<Node> {
+  readonly emitter = new vscode.EventEmitter<Node | undefined>();
+  readonly onDidChangeTreeData = this.emitter.event;
+  plugins: PluginRecord[] = [];
+  skills: SkillRecord[] = [];
+  mcps: McpRecord[] = [];
+  filter = "";
+  private readonly expansion = new ResourceExpansionState();
+  private readonly tools = new Map<string, McpTool[]>();
+
+  async refresh(): Promise<void> {
+    const [plugins, skills, mcps] = await Promise.all([
+      discoverPlugins(coreOptions()),
+      discoverSkills(coreOptions()),
+      discoverMcps(coreOptions()),
+    ]);
+    this.plugins = plugins.plugins;
+    this.skills = skills.skills;
+    this.mcps = mcps.mcps;
+    this.expansion.reset();
+    this.tools.clear();
+    this.emitter.fire(undefined);
+  }
+
+  setTools(mcp: McpRecord, tools: McpTool[]): void {
+    this.tools.set(mcp.id, tools);
+    this.emitter.fire(undefined);
+  }
+
+  syncCachedTools(cache: McpToolCache): void {
+    for (const mcp of this.mcps) this.tools.set(mcp.id, cache.toolsFor(mcp));
+    this.emitter.fire(undefined);
+  }
+
+  setFilter(value: string): void {
+    this.filter = value;
+    this.expansion.resetMaterializedNodes();
+    this.emitter.fire(undefined);
+  }
+
+  setNodeExpanded(node: Node, expanded: boolean): void {
+    if (!nodeIsExpandable(node, true, true)) return;
+    this.expansion.setNodeExpanded({ id: nodeKey(node), nestedResource: node.kind === "plugin" || node.kind === "skill" }, expanded);
+  }
+
+  getTreeItem(node: Node): vscode.TreeItem {
+    const expandable = nodeIsExpandable(node, true, true);
+    const expanded = expandable
+      ? this.expansion.register({ id: nodeKey(node), nestedResource: node.kind === "plugin" || node.kind === "skill" })
+      : true;
+    return createTreeItem(node, expanded, true, true);
+  }
+
+  getChildren(node?: Node): Node[] {
+    if (!node) {
+      const filter = this.filter.toLowerCase();
+      return this.plugins
+        .filter((plugin) => !filter || `${plugin.name} ${plugin.root}`.toLowerCase().includes(filter) || this.skills.some((skill) => skill.plugin?.id === plugin.id && `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter)) || this.mcps.some((mcp) => mcp.plugin?.id === plugin.id && `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter)))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root))
+        .map(pluginNode);
+    }
+    if (node.kind === "plugin" && node.plugin) {
+      const plugin = node.plugin;
+      const skills = this.skills.filter((skill) => skill.plugin?.id === plugin.id);
+      const mcps = this.mcps.filter((mcp) => mcp.plugin?.id === plugin.id);
+      const scope = plugin.scope ?? "global";
+      return visibleGroupKinds({ plugins: false, skills: skills.length > 0, mcps: mcps.length > 0 })
+        .map((kind) => ({
+          kind: "group" as const,
+          label: kind === "skills" ? "Skills" : "MCPs",
+          scope,
+          targetPath: kind === "skills" ? join(plugin.root, "skills") : plugin.mcpPath ?? join(plugin.root, ".mcp.json"),
+          groupKind: kind,
+          parentPlugin: plugin,
+        }));
+    }
+    if (node.kind === "group" && node.parentPlugin) {
+      const filter = this.filter.toLowerCase();
+      if (node.groupKind === "skills") return this.skills.filter((skill) => skill.plugin?.id === node.parentPlugin!.id && (!filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter))).map(skillNode);
+      if (node.groupKind === "mcps") return this.mcps.filter((mcp) => mcp.plugin?.id === node.parentPlugin!.id && (!filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter))).map(mcpNode);
+    }
+    if (node.kind === "mcp" && node.mcp)
+      return (this.tools.get(node.mcp.id) ?? []).map((tool) => mcpToolNode(tool, node.mcp!));
+    if (node.kind === "skill" && node.skill)
+      return node.skill.supportingEntries.map((entry): Node => ({ kind: "entry", label: entry.name, scope: node.scope, entry, underSkill: true }));
+    if (node.kind === "entry" && node.entry?.children)
+      return node.entry.children.map((entry): Node => ({ kind: "entry", label: entry.name, scope: node.scope, entry, underSkill: node.underSkill }));
+    return [];
   }
 }
 
@@ -680,7 +844,6 @@ class AgentsProvider implements vscode.TreeDataProvider<Node> {
   agents: AgentRecord[] = [];
   globalRoot = "";
   workspaceRoot?: string;
-  private expanded = true;
   async refresh(): Promise<void> {
     const result = await discoverAgents(coreOptions());
     this.agents = result.agents;
@@ -690,63 +853,14 @@ class AgentsProvider implements vscode.TreeDataProvider<Node> {
       : undefined;
     this.emitter.fire(undefined);
   }
-  setExpanded(value: boolean): void {
-    this.expanded = value;
-    this.emitter.fire(undefined);
-  }
-  isExpanded(): boolean {
-    return this.expanded;
-  }
   getTreeItem(node: Node): vscode.TreeItem {
-    return createTreeItem(node, this.expanded, false, false);
+    return createTreeItem(node, false, false, false);
   }
   getChildren(node?: Node): Node[] {
-    if (!node)
-      return [
-        {
-          kind: "root",
-          label: `Global — ${this.globalRoot || "~/.codex/agents"}`,
-          scope: "global",
-          targetPath: this.globalRoot,
-        },
-        {
-          kind: "root",
-          label: `Workspace — ${this.workspaceRoot || ".codex/agents"}`,
-          scope: "workspace",
-          targetPath: this.workspaceRoot,
-        },
-      ];
-    const root =
-      node.scope === "global" ? this.globalRoot : this.workspaceRoot;
-    if (!root || !node.scope) return [];
-    const children = agentTreeChildren(
-      this.agents,
-      node.scope,
-      root,
-      node.kind === "root" ? "" : node.relativePath,
-    );
-    return children.map((child): Node =>
-      child.kind === "directory"
-        ? {
-            kind: "agentDir",
-            label: child.name,
-            scope: node.scope,
-            targetPath: child.path,
-            relativePath: child.relativePath,
-            entry: {
-              name: child.name,
-              path: child.path,
-              kind: "directory",
-            },
-          }
-        : {
-            kind: "agent",
-            label: `📄 ${child.agent.name}`,
-            scope: child.agent.scope,
-            targetPath: child.agent.path,
-            agent: child.agent,
-          },
-    );
+    if (node) return [];
+    return [...this.agents]
+      .sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path))
+      .map(agentNode);
   }
 }
 
@@ -886,6 +1000,7 @@ async function confirmDelete(resources: ResourceIdentity[]): Promise<boolean> {
 
 export function activate(context: vscode.ExtensionContext): void {
   const resources = new ResourcesProvider();
+  const plugins = new FlatPluginsProvider();
   const skills = new FlatSkillsProvider();
   const mcps = new FlatMcpProvider();
   const info = new InfoView();
@@ -910,6 +1025,7 @@ export function activate(context: vscode.ExtensionContext): void {
         ...entry.diagnostics,
       ];
       resources.setTools(mcp, entry.tools);
+      plugins.setTools(mcp, entry.tools);
       mcps.setTools(mcp, entry.tools);
       info.setToolsFor(mcp, entry.tools);
     }
@@ -926,6 +1042,13 @@ export function activate(context: vscode.ExtensionContext): void {
         handleDrop(target, resources),
       ),
     });
+  const pluginView = vscode.window.createTreeView("codexPowerToys.plugins", {
+    treeDataProvider: plugins,
+    canSelectMany: true,
+    dragAndDropController: new ResourceDragController((target, resources) =>
+      handleDrop(target, resources),
+    ),
+  });
   const skillView = vscode.window.createTreeView("codexPowerToys.skills", {
     treeDataProvider: skills,
     canSelectMany: true,
@@ -950,6 +1073,7 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   context.subscriptions.push(
     resourceView,
+    pluginView,
     skillView,
     mcpView,
     agentView,
@@ -958,7 +1082,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const command = (name: string, handler: (...args: any[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(name, handler));
   const refresh = async () => {
-    await Promise.all([resources.refresh(), skills.refresh(), mcps.refresh(), agents.refresh()]);
+    await Promise.all([resources.refresh(), plugins.refresh(), skills.refresh(), mcps.refresh(), agents.refresh()]);
   };
   const selectedResources = (first?: Node, selected?: readonly Node[]) =>
     [
@@ -972,7 +1096,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ]
       .map(nodeResource)
       .filter((resource): resource is ResourceIdentity => Boolean(resource));
-  const setExpansionContext = async (view: "resources" | "agents", expanded: boolean) => {
+  const setExpansionContext = async (view: "resources", expanded: boolean) => {
     await vscode.commands.executeCommand(
       "setContext",
       `codexPowerToys.${view}TreeExpanded`,
@@ -982,7 +1106,6 @@ export function activate(context: vscode.ExtensionContext): void {
   const syncExpansionContexts = async (): Promise<void> => {
     await Promise.all([
       setExpansionContext("resources", resources.shouldShowCollapse()),
-      setExpansionContext("agents", agents.isExpanded()),
     ]);
   };
   const syncResourceStateContext = async (): Promise<void> => {
@@ -1011,6 +1134,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const refreshAll = async (forceMcpNames: ReadonlySet<string> = new Set()) => {
     await refresh();
     resources.syncCachedTools(mcpToolCache);
+    plugins.syncCachedTools(mcpToolCache);
     mcps.syncCachedTools(mcpToolCache);
     mcpToolCache.enqueueEnabled(resources.mcps, forceMcpNames);
     await Promise.all([syncExpansionContexts(), syncResourceStateContext()]);
@@ -1154,6 +1278,8 @@ export function activate(context: vscode.ExtensionContext): void {
   command("codexPowerToys.resources.clearFilter", () => clearFilter("Resources", resources));
   command("codexPowerToys.skills.filter", () => filterCommand("Skills", skills));
   command("codexPowerToys.skills.clearFilter", () => clearFilter("Skills", skills));
+  command("codexPowerToys.plugins.filter", () => filterCommand("Plugins", plugins));
+  command("codexPowerToys.plugins.clearFilter", () => clearFilter("Plugins", plugins));
   command("codexPowerToys.mcp.filter", () => filterCommand("MCPs", mcps));
   command("codexPowerToys.mcp.clearFilter", () => clearFilter("MCPs", mcps));
   command("codexPowerToys.resources.collapseAll", async () => {
@@ -1163,14 +1289,6 @@ export function activate(context: vscode.ExtensionContext): void {
   command("codexPowerToys.resources.expandAll", async () => {
     resources.applyToolbarExpansion();
     await setExpansionContext("resources", resources.shouldShowCollapse());
-  });
-  command("codexPowerToys.agents.collapseAll", async () => {
-    agents.setExpanded(false);
-    await setExpansionContext("agents", false);
-  });
-  command("codexPowerToys.agents.expandAll", async () => {
-    agents.setExpanded(true);
-    await setExpansionContext("agents", true);
   });
   const skillAction =
     (scope: Scope, enabled: boolean) => async (skill: SkillRecord) => {
@@ -1385,7 +1503,7 @@ export function activate(context: vscode.ExtensionContext): void {
       "Skill creator prompt copied. Paste it into a new Codex chat.",
     );
   });
-  for (const view of [resourceView, skillView, mcpView, agentView])
+  for (const view of [resourceView, pluginView, skillView, mcpView, agentView])
     view.onDidChangeSelection((event) => {
       activeSelection = event.selection;
       lastTarget = event.selection[0];
@@ -1412,6 +1530,10 @@ export function activate(context: vscode.ExtensionContext): void {
     mcpView.onDidCollapseElement((event) => {
       mcps.setNodeExpanded(event.element, false);
     }),
+    pluginView.onDidExpandElement((event) => plugins.setNodeExpanded(event.element, true)),
+    pluginView.onDidCollapseElement((event) => plugins.setNodeExpanded(event.element, false)),
+    skillView.onDidExpandElement((event) => skills.setNodeExpanded(event.element, true)),
+    skillView.onDidCollapseElement((event) => skills.setNodeExpanded(event.element, false)),
   );
   void syncExpansionContexts();
   void refreshAll();
