@@ -25,16 +25,13 @@ test("extension manifest registers inspector views and commands", async () => {
     (view) => view.id,
   );
   assert.deepEqual(views, [
-    "codexPowerToys.skills",
-    "codexPowerToys.plugins",
+    "codexPowerToys.resources",
     "codexPowerToys.agents",
-    "codexPowerToys.mcps",
     "codexPowerToys.info",
   ]);
   const toolbarCommands = manifest.contributes.commands.filter((command) =>
     [
       "codexPowerToys.refresh",
-      "codexPowerToys.skills.toggleMode",
       "codexPowerToys.skills.toggleSupporting",
       "codexPowerToys.skills.filter",
       "codexPowerToys.startSkillCreator",
@@ -51,6 +48,12 @@ test("extension manifest registers inspector views and commands", async () => {
     ),
   );
   assert.match(source, /canSelectMany:\s*true/);
-  assert.match(source, /createTreeView\("codexPowerToys.plugins"/);
+  assert.match(source, /createTreeView\("codexPowerToys.resources"/);
+  assert.doesNotMatch(source, /TreeItemCheckboxState|checkboxState/);
+  assert.match(source, /🔌/);
+  assert.match(source, /🧰/);
+  assert.match(source, /🔨/);
+  assert.match(source, /🧠/);
+  assert.match(source, /sourceNodeKind: "pluginMcp"/);
   assert.match(source, /new ResourceDragController/);
 });
