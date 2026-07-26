@@ -47,6 +47,13 @@ test("resource groups and expansion state preserve skill-specific behavior", asy
   assert.match(source, /if \(key === "Resources"\) void syncExpansionContexts\(\)/);
 });
 
+test("resource toolbar drives the native TreeView instead of only refreshing provider state", async () => {
+  const source = await extensionSource();
+  assert.match(source, /getParent\(node: Node\): Node \| undefined/);
+  assert.match(source, /workbench\.actions\.treeView\.codexPowerToys\.resources\.collapseAll/);
+  assert.match(source, /resourceView\.reveal\(/);
+});
+
 test("resource labels use status and type glyphs without native checkboxes", async () => {
   const source = await extensionSource();
   assert.match(source, /const TYPE_ICONS = \{ plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪", agent: "🤖" \}/);

@@ -70,6 +70,7 @@ type Node = {
   parentPlugin?: PluginRecord;
   underSkill?: boolean;
   underMcp?: boolean;
+  parent?: Node;
 };
 
 type ClipboardState = {
@@ -439,16 +440,9 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     this.expansion.setNodeExpanded(resourcesExpansionNode(node), expanded);
   }
 
-  applyExpansion(action: ExpansionAction): void {
+  applyExpansion(action: ExpansionAction, refresh = true): void {
     this.expansion.apply(action);
-    this.emitter.fire(undefined);
-  }
-
-  applyToolbarExpansion(): ExpansionAction {
-    const action = this.expansion.toolbarAction();
-    this.expansion.apply(action);
-    this.emitter.fire(undefined);
-    return action;
+    if (refresh) this.emitter.fire(undefined);
   }
 
   shouldShowCollapse(): boolean {
@@ -471,6 +465,22 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     return createTreeItem(node, expanded, this.showSupporting, true);
   }
 
+  getParent(node: Node): Node | undefined {
+    return node.parent;
+  }
+
+  expansionTargets(): Node[] {
+    const targets: Node[] = [];
+    const visit = (node: Node): void => {
+      if (!nodeIsExpandable(node, this.showSupporting, true)) return;
+      if (node.kind === "skill" || node.underSkill) return;
+      targets.push(node);
+      for (const child of this.getChildren(node)) visit(child);
+    };
+    for (const root of this.getChildren()) visit(root);
+    return targets;
+  }
+
   getChildren(node?: Node): Node[] {
     if (!node) {
       return [
@@ -488,38 +498,53 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
         },
       ];
     }
-    if (node.kind === "root") return this.scopeGroups(node.scope!);
-    if (node.kind === "group") return this.groupChildren(node);
-    if (node.kind === "plugin" && node.plugin) return this.pluginGroups(node.plugin);
+    if (node.kind === "root") return this.withParent(this.scopeGroups(node.scope!), node);
+    if (node.kind === "group") return this.withParent(this.groupChildren(node), node);
+    if (node.kind === "plugin" && node.plugin)
+      return this.withParent(this.pluginGroups(node.plugin), node);
     if (node.kind === "mcp" && node.mcp)
-      return (this.tools.get(node.mcp.id) ?? []).map((tool) =>
-        mcpToolNode(tool, node.mcp!),
+      return this.withParent(
+        (this.tools.get(node.mcp.id) ?? []).map((tool) => mcpToolNode(tool, node.mcp!)),
+        node,
       );
     if (node.kind === "skill" && node.skill && this.showSupporting)
-      return node.skill.supportingEntries.map((entry): Node => ({
-        kind: "entry",
-        label: entry.name,
-        scope: node.scope,
-        entry,
-        underSkill: true,
-      }));
+      return this.withParent(
+        node.skill.supportingEntries.map((entry): Node => ({
+          kind: "entry",
+          label: entry.name,
+          scope: node.scope,
+          entry,
+          underSkill: true,
+        })),
+        node,
+      );
     if (node.kind === "entry" && node.entry?.children && this.showSupporting)
-      return node.entry.children.map((entry): Node => ({
-        kind: "entry",
-        label: entry.name,
-        scope: node.scope,
-        entry,
-        underSkill: node.underSkill,
-      }));
+      return this.withParent(
+        node.entry.children.map((entry): Node => ({
+          kind: "entry",
+          label: entry.name,
+          scope: node.scope,
+          entry,
+          underSkill: node.underSkill,
+        })),
+        node,
+      );
     if (node.kind === "agentDir" && node.scope && node.targetPath) {
       const root = node.scope === "global" ? join(this.roots?.codexHome ?? homedir(), "agents") : this.roots?.workspaceRoot ? join(this.roots.workspaceRoot, ".codex", "agents") : undefined;
-      return agentTreeChildren(this.filteredAgents(node.scope), node.scope, root, node.relativePath).map((child): Node =>
-        child.kind === "directory"
-          ? { kind: "agentDir", label: child.name, scope: node.scope, targetPath: child.path, relativePath: child.relativePath }
-          : agentNode(child.agent),
+      return this.withParent(
+        agentTreeChildren(this.filteredAgents(node.scope), node.scope, root, node.relativePath).map((child): Node =>
+          child.kind === "directory"
+            ? { kind: "agentDir", label: child.name, scope: node.scope, targetPath: child.path, relativePath: child.relativePath }
+            : agentNode(child.agent),
+        ),
+        node,
       );
     }
     return [];
+  }
+
+  private withParent(nodes: Node[], parent: Node): Node[] {
+    return nodes.map((node) => ({ ...node, parent }));
   }
 
   private matches(name: string, path: string): boolean {
@@ -1344,11 +1369,20 @@ export function activate(context: vscode.ExtensionContext): void {
     mcps.setShowSuperseded(!mcps.showSuperseded);
   });
   command("codexPowerToys.resources.collapseAll", async () => {
-    resources.applyExpansion("collapseAll");
+    resources.applyExpansion("collapseAll", false);
+    await vscode.commands.executeCommand(
+      "workbench.actions.treeView.codexPowerToys.resources.collapseAll",
+    );
+    for (const root of resources.getChildren()) {
+      await resourceView.reveal(root, { expand: true, select: false, focus: false });
+    }
     await setExpansionContext("resources", resources.shouldShowCollapse());
   });
   command("codexPowerToys.resources.expandAll", async () => {
-    resources.applyToolbarExpansion();
+    resources.applyExpansion("expandNonSkills", false);
+    for (const node of resources.expansionTargets()) {
+      await resourceView.reveal(node, { expand: true, select: false, focus: false });
+    }
     await setExpansionContext("resources", resources.shouldShowCollapse());
   });
   const skillAction =
