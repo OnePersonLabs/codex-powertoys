@@ -1,7 +1,7 @@
 {
   "name": "codex-powertoys",
   "description": "Inspect and safely manage Codex skills, plugins, agents, and MCP configuration.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "onepersonlabs",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,7 @@
   "private": false,
   "packageManager": "pnpm@10.30.0",
   "scripts": {
-    "version:patch": "pnpm -r exec npm version patch --no-git-tag-version",
+    "version:patch": "npm version patch --no-git-tag-version && pnpm -r exec npm version patch --no-git-tag-version",
     "publish:patch": "pnpm run version:patch && git add package.json apps/*/package.json packages/*/package.json && git commit -m \"chore: release $(node -p \"JSON.parse(require('fs').readFileSync('./package.json', 'utf8')).version\")\" && git tag \"v$(node -p \"JSON.parse(require('fs').readFileSync('./package.json', 'utf8')).version\")\" && git push origin main --tags",
     "install:local": "pnpm run build && pnpm run package:cli && pnpm run package:vscode && node -e \"const fs=require('fs'),path=require('path'),cp=require('child_process'); const dir='apps/vscode'; const files=fs.readdirSync(dir).filter(f=>f.endsWith('.vsix')).sort((a,b)=>b.localeCompare(a, undefined, {numeric: true, sensitivity: 'base'})); if(!files.length) process.exit(1); cp.execSync('code --install-extension ' + path.join(dir, files[0]) + ' --force', {stdio:'inherit'});\" && echo Restart VS Code",
     "build": "pnpm --filter @codex-powertoys/core build && pnpm --filter @codex-powertoys/cli build && pnpm --filter codex-powertoys-vscode build",
