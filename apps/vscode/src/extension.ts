@@ -31,6 +31,7 @@ import {
   setPluginEnabled,
   setSkillEnabled,
   transferResources,
+  resourceStatusGlyph,
   type AgentRecord,
   type McpRecord,
   type McpTool,
@@ -99,11 +100,10 @@ function statusGlyph(value: SkillRecord | McpRecord | PluginRecord): string {
   const effective = "state" in value
     ? value.state.effective
     : value.effective;
-  if (effective === "active") return "✅";
-  if (effective === "shadowed") return "✖️";
-  if (value.scope === "workspace" && "enabled" in value && value.enabled === false) return "✖️";
-  if ("state" in value && value.state.workspace === "disabled" && value.state.global !== "disabled") return "✖️";
-  return "❌";
+  const shadowedByEnabled = "state" in value
+    ? value.state.shadowedByEnabled
+    : value.shadowedByEnabled;
+  return resourceStatusGlyph(effective, shadowedByEnabled);
 }
 
 function typedLabel(
@@ -1388,7 +1388,7 @@ export function activate(context: vscode.ExtensionContext): void {
     await setExpansionContext("resources", resources.shouldShowCollapse());
   });
   const skillAction =
-    (scope: Scope, enabled: boolean) => async (target: unknown) => {
+    (scope: Scope, enabled: boolean | undefined) => async (target: unknown) => {
       const skill = unwrapCommandTarget<SkillRecord>(target, "skill");
       if (!skill) return;
       await setSkillEnabled(coreOptions(), skill.skillPath, scope, enabled);
@@ -1397,10 +1397,10 @@ export function activate(context: vscode.ExtensionContext): void {
   for (const [name, scope, enabled] of [
     ["enableGlobal", "global", true],
     ["disableGlobal", "global", false],
-    ["resetGlobal", "global", true],
+    ["resetGlobal", "global", undefined],
     ["enableLocal", "workspace", true],
     ["disableLocal", "workspace", false],
-    ["resetLocal", "workspace", true],
+    ["resetLocal", "workspace", undefined],
   ] as const)
     command(`codexPowerToys.skill.${name}`, skillAction(scope, enabled));
   command("codexPowerToys.mcp.add", async () => {

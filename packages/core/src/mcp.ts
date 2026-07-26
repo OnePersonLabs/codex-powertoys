@@ -27,8 +27,26 @@ export async function discoverMcps(options: DiscoveryOptions = {}): Promise<{ ro
   for (const group of grouped.values()) {
     // Configuration records establish precedence even when disabled. Plugin records
     // still need to be available and not superseded by plugin-level deduplication.
-    const candidates = group.filter((record) => record.sourceKind === "config" || (record.pluginEnabled && record.plugin?.effective !== "shadowed")).sort((a, b) => precedence(a) - precedence(b) || a.id.localeCompare(b.id)); const winner = candidates[0];
-    for (const record of group) { record.pluginEnabled = record.plugin?.enabled ?? true; record.disabledByPlugin = !record.pluginEnabled; if (winner && winner !== record) { record.effective = "shadowed"; record.shadowedBy = winner.id; } else if (record.plugin?.effective === "shadowed") { record.effective = "shadowed"; record.shadowedBy = record.plugin.shadowedBy; } else if (!record.pluginEnabled) record.effective = "unavailable"; else if (!record.enabled) record.effective = "disabled"; else record.effective = "active"; }
+    const candidates = group
+      .filter((record) => record.sourceKind === "config" || record.plugin?.effective !== "shadowed")
+      .sort((a, b) => precedence(a) - precedence(b) || a.id.localeCompare(b.id));
+    const winner = candidates[0];
+    for (const record of group) {
+      record.pluginEnabled = record.plugin?.enabled ?? true;
+      record.disabledByPlugin = !record.pluginEnabled;
+      if (!record.pluginEnabled) {
+        record.effective = "unavailable";
+      } else if (winner && winner !== record) {
+        record.effective = "shadowed";
+        record.shadowedBy = winner.id;
+        record.shadowedByEnabled = (winner.plugin?.enabled ?? true) && winner.enabled;
+      } else if (record.plugin?.effective === "shadowed") {
+        record.effective = "shadowed";
+        record.shadowedBy = record.plugin.shadowedBy;
+        record.shadowedByEnabled = record.plugin.shadowedByEnabled ?? true;
+      } else if (!record.enabled) record.effective = "disabled";
+      else record.effective = "active";
+    }
   }
   return { roots, mcps: mcps.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope) || a.sourceKind.localeCompare(b.sourceKind)), diagnostics };
 }

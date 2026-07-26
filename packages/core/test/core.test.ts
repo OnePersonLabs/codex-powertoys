@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discoverAgents, discoverMcps, discoverPlugins, discoverSkills, deleteResource, loadMcpTools, renameAgent, renameMcpAcrossScopes, renameSkill, setMcpState, setPluginEnabled, setSkillEnabled, transferResources } from "../src/index.js";
+import { discoverAgents, discoverMcps, discoverPlugins, discoverSkills, deleteResource, loadMcpTools, renameAgent, renameMcpAcrossScopes, renameSkill, resourceStatusGlyph, setMcpState, setPluginEnabled, setSkillEnabled, transferResources } from "../src/index.js";
 import type { McpRecord, McpTransport } from "../src/index.js";
 
 async function fixture() {
@@ -24,7 +24,23 @@ test("malformed optional metadata remains visible with a diagnostic", async () =
 });
 
 test("skill disable and reset preserve unrelated config", async () => {
-  const values = await fixture(); const global = join(values.codex, "config.toml"); await setSkillEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, join(values.home, ".agents", "skills", "alpha", "SKILL.md"), "global", false); let text = await readFile(global, "utf8"); assert.match(text, /enabled = false/); assert.match(text, /mcp_servers\.test/); await setSkillEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, join(values.home, ".agents", "skills", "alpha", "SKILL.md"), "global", true); text = await readFile(global, "utf8"); assert.doesNotMatch(text, /skills\.config/); assert.match(text, /mcp_servers\.test/);
+  const values = await fixture(); const global = join(values.codex, "config.toml"); await setSkillEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, join(values.home, ".agents", "skills", "alpha", "SKILL.md"), "global", false); let text = await readFile(global, "utf8"); assert.match(text, /enabled = false/); assert.match(text, /mcp_servers\.test/); await setSkillEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, join(values.home, ".agents", "skills", "alpha", "SKILL.md"), "global", undefined); text = await readFile(global, "utf8"); assert.doesNotMatch(text, /skills\.config/); assert.match(text, /mcp_servers\.test/);
+});
+
+test("workspace skill enablement persists explicit true over a global disablement", async () => {
+  const values = await fixture();
+  const skillPath = join(values.home, ".agents", "skills", "beta", "SKILL.md");
+  await mkdir(join(values.home, ".agents", "skills", "beta"), { recursive: true });
+  await writeFile(skillPath, "---\nname: beta\n---\nBeta skill\n");
+  const options = { homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace };
+  await setSkillEnabled(options, skillPath, "global", false);
+  await setSkillEnabled(options, skillPath, "workspace", true);
+  assert.match(await readFile(join(values.workspace, ".codex", "config.toml"), "utf8"), /enabled = true/);
+  const beta = (await discoverSkills(options)).skills.find((skill) => skill.skillPath === skillPath)!;
+  assert.equal(beta.state.global, "disabled");
+  assert.equal(beta.state.workspace, "enabled");
+  assert.equal(beta.state.effective, "active");
+  assert.equal(beta.state.glyph, "✅");
 });
 
 test("discovers MCP nested config and mutates only enabled", async () => {
@@ -61,6 +77,70 @@ test("workspace MCP config outranks global config even when disabled", async () 
   assert.equal(workspace?.effective, "disabled");
   assert.equal(global?.effective, "shadowed");
   assert.equal(global?.shadowedBy, workspace?.id);
+  assert.equal(resourceStatusGlyph(workspace!.effective, workspace!.shadowedByEnabled), "❌");
+  assert.equal(resourceStatusGlyph(global!.effective, global!.shadowedByEnabled), "✖️");
+});
+
+test("workspace MCP enablement supersedes a global disablement", async () => {
+  const values = await fixture();
+  await writeFile(join(values.codex, "config.toml"), `${await readFile(join(values.codex, "config.toml"), "utf8")}\n[mcp_servers.scopeWinner]\ncommand = "global"\nenabled = false\n`);
+  await writeFile(join(values.workspace, ".codex", "config.toml"), `[mcp_servers.scopeWinner]\ncommand = "workspace"\nenabled = true\n`);
+  const records = (await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).mcps.filter((record) => record.name === "scopeWinner");
+  const global = records.find((record) => record.scope === "global");
+  const workspace = records.find((record) => record.scope === "workspace");
+  assert.equal(workspace?.effective, "active");
+  assert.equal(global?.effective, "shadowed");
+  assert.equal(global?.shadowedByEnabled, true);
+  assert.equal(resourceStatusGlyph(workspace!.effective, workspace!.shadowedByEnabled), "✅");
+  assert.equal(resourceStatusGlyph(global!.effective, global!.shadowedByEnabled), "☑️");
+});
+
+test("skill precedence distinguishes shadowed enabled and disabled winners", async () => {
+  const values = await fixture();
+  const globalSkill = join(values.home, ".agents", "skills", "alpha", "SKILL.md");
+  const workspaceSkill = join(values.workspace, ".agents", "skills", "alpha", "SKILL.md");
+  await writeFile(join(values.codex, "config.toml"), `${await readFile(join(values.codex, "config.toml"), "utf8")}\n[[skills.config]]\npath = ${JSON.stringify(globalSkill)}\nenabled = false\n`);
+  let result = await discoverSkills({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace });
+  let alpha = result.skills.filter((skill) => skill.name === "alpha");
+  let global = alpha.find((skill) => skill.skillPath === globalSkill)!;
+  let workspace = alpha.find((skill) => skill.skillPath === workspaceSkill)!;
+  assert.equal(workspace.state.effective, "active");
+  assert.equal(global.state.effective, "shadowed");
+  assert.equal(global.state.shadowedByEnabled, true);
+  assert.equal(resourceStatusGlyph(global.state.effective, global.state.shadowedByEnabled), "☑️");
+
+  await writeFile(join(values.workspace, ".codex", "config.toml"), `[[skills.config]]\npath = ${JSON.stringify(workspaceSkill)}\nenabled = false\n`);
+  result = await discoverSkills({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace });
+  alpha = result.skills.filter((skill) => skill.name === "alpha");
+  global = alpha.find((skill) => skill.skillPath === globalSkill)!;
+  workspace = alpha.find((skill) => skill.skillPath === workspaceSkill)!;
+  assert.equal(workspace.state.effective, "disabled");
+  assert.equal(global.state.effective, "shadowed");
+  assert.equal(global.state.shadowedByEnabled, false);
+  assert.equal(resourceStatusGlyph(global.state.effective, global.state.shadowedByEnabled), "✖️");
+});
+
+test("workspace plugin precedence ignores global disablement and reports disabled shadowing", async () => {
+  const values = await fixture();
+  const workspacePlugin = join(values.workspace, ".codex", "plugins", "plugin", "2.0.0");
+  await mkdir(join(workspacePlugin, ".codex-plugin"), { recursive: true });
+  await writeFile(join(workspacePlugin, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "plugin", version: "2.0.0" }));
+  let plugins = (await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).plugins.filter((plugin) => plugin.name === "plugin");
+  let global = plugins.find((plugin) => plugin.scope === "global")!;
+  let workspace = plugins.find((plugin) => plugin.scope === "workspace")!;
+  assert.equal(workspace.effective, "active");
+  assert.equal(global.effective, "shadowed");
+  assert.equal(global.shadowedByEnabled, true);
+  assert.equal(resourceStatusGlyph(global.effective, global.shadowedByEnabled), "☑️");
+
+  await writeFile(join(values.workspace, ".codex", "config.toml"), `[plugins."plugin@plugin"]\nenabled = false\n`);
+  plugins = (await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).plugins.filter((plugin) => plugin.name === "plugin");
+  global = plugins.find((plugin) => plugin.scope === "global")!;
+  workspace = plugins.find((plugin) => plugin.scope === "workspace")!;
+  assert.equal(workspace.effective, "disabled");
+  assert.equal(global.effective, "shadowed");
+  assert.equal(global.shadowedByEnabled, false);
+  assert.equal(resourceStatusGlyph(global.effective, global.shadowedByEnabled), "✖️");
 });
 
 test("workspace plugin MCP outranks a global config MCP", async () => {
@@ -76,6 +156,36 @@ test("workspace plugin MCP outranks a global config MCP", async () => {
   assert.equal(workspace?.effective, "active");
   assert.equal(global?.effective, "shadowed");
   assert.equal(global?.shadowedBy, workspace?.id);
+});
+
+test("disabled workspace plugin contributions block lower-precedence resources", async () => {
+  const values = await fixture();
+  const pluginRoot = join(values.workspace, ".codex", "plugins", "workspace-blocker", "1.0.0");
+  await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
+  await mkdir(join(pluginRoot, "skills", "blocked-skill"), { recursive: true });
+  await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "workspace-blocker", mcpServers: "./mcp.json", skills: "./skills" }));
+  await writeFile(join(pluginRoot, "mcp.json"), JSON.stringify({ mcpServers: { blocked: { command: "echo" } } }));
+  await writeFile(join(pluginRoot, "skills", "blocked-skill", "SKILL.md"), "---\nname: blocked-skill\n---\nWorkspace plugin skill\n");
+  await mkdir(join(values.home, ".agents", "skills", "blocked-skill"), { recursive: true });
+  await writeFile(join(values.home, ".agents", "skills", "blocked-skill", "SKILL.md"), "---\nname: blocked-skill\n---\nGlobal skill\n");
+  await writeFile(join(values.codex, "config.toml"), `${await readFile(join(values.codex, "config.toml"), "utf8")}\n[mcp_servers.blocked]\ncommand = "global"\n`);
+  await writeFile(join(values.workspace, ".codex", "config.toml"), `[plugins."workspace-blocker@workspace-blocker"]\nenabled = false\n`);
+
+  const mcps = (await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).mcps.filter((record) => record.name === "blocked");
+  const globalMcp = mcps.find((record) => record.scope === "global")!;
+  const workspaceMcp = mcps.find((record) => record.scope === "workspace")!;
+  assert.equal(workspaceMcp.effective, "unavailable");
+  assert.equal(globalMcp.effective, "shadowed");
+  assert.equal(globalMcp.shadowedByEnabled, false);
+  assert.equal(resourceStatusGlyph(globalMcp.effective, globalMcp.shadowedByEnabled), "✖️");
+
+  const skills = (await discoverSkills({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).skills.filter((record) => record.name === "blocked-skill");
+  const globalSkill = skills.find((record) => record.scope === "global")!;
+  const workspaceSkill = skills.find((record) => record.scope === "workspace")!;
+  assert.equal(workspaceSkill.state.effective, "unavailable");
+  assert.equal(globalSkill.state.effective, "shadowed");
+  assert.equal(globalSkill.state.shadowedByEnabled, false);
+  assert.equal(resourceStatusGlyph(globalSkill.state.effective, globalSkill.state.shadowedByEnabled), "✖️");
 });
 
 test("requires a Codex plugin manifest and preserves declared MCP paths", async () => {
