@@ -207,12 +207,14 @@
       {
         "command": "codexPowerToys.plugin.enable",
         "title": "Enable Plugin",
-        "icon": "$(play)"
+        "icon": "$(play)",
+        "enablement": "!resourceEnabled"
       },
       {
         "command": "codexPowerToys.plugin.disable",
         "title": "Disable Plugin",
-        "icon": "$(debug-pause)"
+        "icon": "$(debug-pause)",
+        "enablement": "resourceEnabled"
       },
       {
         "command": "codexPowerToys.plugin.reset",
@@ -231,29 +233,35 @@
       },
       {
         "command": "codexPowerToys.mcp.enableGlobal",
-        "title": "Enable MCP Globally"
+        "title": "Enable MCP Globally",
+        "enablement": "!resourceEnabled"
       },
       {
         "command": "codexPowerToys.mcp.disableGlobal",
-        "title": "Disable MCP Globally"
+        "title": "Disable MCP Globally",
+        "enablement": "resourceEnabled"
       },
       {
         "command": "codexPowerToys.mcp.enableLocal",
-        "title": "Enable MCP Locally"
+        "title": "Enable MCP Locally",
+        "enablement": "!resourceEnabled"
       },
       {
         "command": "codexPowerToys.mcp.disableLocal",
-        "title": "Disable MCP Locally"
+        "title": "Disable MCP Locally",
+        "enablement": "resourceEnabled"
       },
       {
         "command": "codexPowerToys.skill.enableGlobal",
         "title": "Enable Skill Globally",
-        "icon": "$(play)"
+        "icon": "$(play)",
+        "enablement": "!resourceEnabled"
       },
       {
         "command": "codexPowerToys.skill.disableGlobal",
         "title": "Disable Skill Globally",
-        "icon": "$(debug-pause)"
+        "icon": "$(debug-pause)",
+        "enablement": "resourceEnabled"
       },
       {
         "command": "codexPowerToys.skill.resetGlobal",
@@ -263,12 +271,14 @@
       {
         "command": "codexPowerToys.skill.enableLocal",
         "title": "Enable Skill Locally",
-        "icon": "$(play)"
+        "icon": "$(play)",
+        "enablement": "!resourceEnabled"
       },
       {
         "command": "codexPowerToys.skill.disableLocal",
         "title": "Disable Skill Locally",
-        "icon": "$(debug-pause)"
+        "icon": "$(debug-pause)",
+        "enablement": "resourceEnabled"
       },
       {
         "command": "codexPowerToys.skill.resetLocal",

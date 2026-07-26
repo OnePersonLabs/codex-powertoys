@@ -5,15 +5,19 @@ Define the unified VS Code resource tree for Skills, Plugins, MCPs, and explicit
 ## Requirements
 
 ### Requirement: Unified scoped resource tree
-The extension SHALL expose Skills, Plugins, and MCPs through one native Resources TreeView with exactly two top-level scope roots: Global and Workspace. Each scope SHALL contain `Plugins`, `MCPs`, and `Skills` group nodes in that order; standalone resources SHALL appear under their type group and plugin-owned resources SHALL appear beneath their owning plugin's corresponding type group.
+The extension SHALL expose Skills, Plugins, and MCPs through one native Resources TreeView with exactly two top-level scope roots: Global and Workspace. Each scope SHALL contain a `Plugins` group, SHALL contain an `MCPs` group only when at least one visible standalone MCP exists, and SHALL contain a `Skills` group only when at least one visible standalone skill exists. Standalone resources SHALL appear under their type group and plugin-owned resources SHALL appear beneath their owning plugin's corresponding non-empty type group.
 
 #### Scenario: Global and workspace roots
 - **WHEN** the Resources view is opened
 - **THEN** it contains a Global root representing `~/` and a Workspace root representing the active workspace, with no type roots above those scope roots
 
-#### Scenario: Explicit type groups
+#### Scenario: Non-empty type groups
 - **WHEN** a scope root is expanded
-- **THEN** it contains `Plugins`, `MCPs`, and `Skills` groups, and standalone MCPs and Skills are not mixed into the Plugins group
+- **THEN** it contains `Plugins` plus only the non-empty `MCPs` and `Skills` groups, and standalone MCPs and Skills are not mixed into the Plugins group
+
+#### Scenario: Empty type groups are omitted
+- **WHEN** a scope has no visible standalone MCPs or Skills, or a plugin has no visible MCPs or Skills
+- **THEN** the corresponding empty `MCPs` or `Skills` group node is not shown
 
 #### Scenario: Resources retain source provenance
 - **WHEN** resources are discovered from `~/.agents`, `~/.codex`, configured roots, workspace roots, or plugin subpaths
@@ -21,7 +25,7 @@ The extension SHALL expose Skills, Plugins, and MCPs through one native Resource
 
 #### Scenario: Resources filter by visible text
 - **WHEN** a Resources filter is active
-- **THEN** only matching resources and the ancestor groups required to reach them are shown, with matches evaluated against the resource name and canonical path
+- **THEN** only matching resources and the non-empty ancestor groups required to reach them are shown, with matches evaluated against the resource name and canonical path
 
 ### Requirement: Preserve plugin filesystem ownership
 The unified tree SHALL represent plugin-owned resources according to the plugin package layout.
