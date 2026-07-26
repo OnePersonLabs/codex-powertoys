@@ -30,6 +30,7 @@ function precedence(record: McpRecord): number {
 }
 
 function betterRecord(candidate: McpRecord, current: McpRecord): McpRecord {
+  if (candidate.id === current.id) return candidate;
   return precedence(candidate) < precedence(current) ||
     (precedence(candidate) === precedence(current) && candidate.id.localeCompare(current.id) < 0)
     ? candidate

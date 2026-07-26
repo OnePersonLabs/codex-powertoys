@@ -13,7 +13,7 @@ The extension SHALL maintain an in-memory, sequential MCP probe queue. At startu
 
 #### Scenario: Cached failure is stable
 - **WHEN** a probe fails
-- **THEN** its diagnostic is cached and passive refresh does not start the MCP again until an explicit refresh, enablement, or Load MCP Tools request queues it
+- **THEN** its diagnostic is cached and passive refresh does not start the MCP again until an explicit enablement or Load MCP Tools re-query queues it
 
 ### Requirement: MCP probe lifecycle safety
 Every MCP probe SHALL initialize the server, request its tool list, and disconnect or terminate the owned transport in a `finally` block. Stdio children SHALL be killed after the attempt, HTTP transports SHALL release their request/session resources, and one probe failure SHALL not prevent later queue entries from running.

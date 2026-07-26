@@ -108,13 +108,17 @@ test("coalesces duplicate refreshes during a probe and re-queries changed policy
   const changed = record("slow", "slow", {
     config: { version: "changed" },
   });
+  const newest = record("slow", "slow", {
+    config: { version: "newest" },
+  });
 
   assert.equal(cache.enqueue(initial), true);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(cache.enqueue(initial), false);
   assert.equal(cache.enqueue(changed), true);
+  assert.equal(cache.enqueue(newest), true);
   release();
   await cache.waitForIdle();
 
-  assert.deepEqual(calls, ["initial", "changed"]);
+  assert.deepEqual(calls, ["initial", "newest"]);
 });
