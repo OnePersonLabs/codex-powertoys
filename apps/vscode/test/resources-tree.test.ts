@@ -11,8 +11,9 @@ async function extensionSource(): Promise<string> {
 
 test("resource provider preserves scope and plugin source hierarchy", async () => {
   const source = await extensionSource();
-  assert.match(source, /label: "Global — ~\//);
-  assert.match(source, /label: `Workspace —/);
+  assert.match(source, /label: "Global"/);
+  assert.match(source, /label: "Workspace"/);
+  assert.match(source, /item\.tooltip = rootTooltip\(path\)/);
   assert.match(source, /visibleGroupKinds\(\{/);
   assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind\)/);
   assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind, plugin\)/);
@@ -41,16 +42,18 @@ test("resource groups and expansion state preserve skill-specific behavior", asy
 
 test("resource labels use status and type glyphs without native checkboxes", async () => {
   const source = await extensionSource();
-  assert.match(source, /const TYPE_ICONS = \{ plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "🧠" \}/);
+  assert.match(source, /const TYPE_ICONS = \{ plugin: "🔌", mcp: "🧰", tool: "🔨", skill: "💪" \}/);
   assert.match(source, /return `\$\{value \? `\$\{statusGlyph\(value\)\} ` : ""\}\$\{TYPE_ICONS\[type\]\}/);
   assert.doesNotMatch(source, /TreeItemCheckboxState|checkboxState|onDidChangeCheckboxState/);
 });
 
-test("MCP tools are attached only by explicit loading", async () => {
+test("MCP tools are populated by the shared background cache", async () => {
   const source = await extensionSource();
   assert.match(source, /command\("codexPowerToys\.mcp\.loadTools"/);
-  assert.match(source, /resources\.setTools\(mcp, result\.tools\)/);
-  assert.match(source, /mcps\.setTools\(mcp, result\.tools\)/);
+  assert.match(source, /mcpToolCache\.enqueue\(mcp, true\)/);
+  assert.match(source, /resources\.setTools\(mcp, entry\.tools\)/);
+  assert.match(source, /mcps\.setTools\(mcp, entry\.tools\)/);
+  assert.match(source, /new McpToolCache/);
   assert.match(source, /kind: "mcpTool"/);
   assert.match(source, /command: "codexPowerToys\.showMcpTool"/);
 });

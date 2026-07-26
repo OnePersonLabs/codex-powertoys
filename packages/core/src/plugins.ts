@@ -1,6 +1,6 @@
 import { access, readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parsePluginOverrides, readConfig, setPluginOverride } from "./toml.js";
+import { parseMcpToolPolicy, parsePluginOverrides, readConfig, setPluginOverride } from "./toml.js";
 import { resolveRoots } from "./paths.js";
 import type { Diagnostic, DiscoveryOptions, McpRecord, PluginInfo, PluginRecord, Scope, SourceRange } from "./types.js";
 
@@ -76,7 +76,8 @@ export async function pluginMcpRecords(plugin: PluginRecord, configPath = plugin
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) { diagnostics.push({ code: "PLUGIN_MCP_INVALID", message: `MCP definition ${name} is not an object`, path: configPath, severity: "warning" }); continue; }
     const config = { ...(raw as Record<string, unknown>) };
     const text = await readFile(configPath, "utf8"); const line = text.split(/\r?\n/).findIndex((item) => new RegExp(`^[\\s\\t]*[\"']?${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\"?\\s*:`).test(item)); const startLine = line < 0 ? 0 : line;
-    mcps.push({ id: `${plugin.id}:mcp:${name}`, name, scope: plugin.scope ?? "global", sourceKind: "plugin", plugin, configPath, config, enabled: plugin.enabled, pluginEnabled: plugin.enabled, effective: plugin.enabled ? "active" : "unavailable", disabledByPlugin: !plugin.enabled, workingDirectory: resolve(plugin.root, typeof config.cwd === "string" ? config.cwd : "."), readOnly: true, sourceRange: { path: configPath, startLine, endLine: startLine }, diagnostics: [] });
+    const toolPolicy = parseMcpToolPolicy(config);
+    mcps.push({ id: `${plugin.id}:mcp:${name}`, name, scope: plugin.scope ?? "global", sourceKind: "plugin", plugin, configPath, config, enabled: plugin.enabled, pluginEnabled: plugin.enabled, effective: plugin.enabled ? "active" : "unavailable", disabledByPlugin: !plugin.enabled, workingDirectory: resolve(plugin.root, typeof config.cwd === "string" ? config.cwd : "."), readOnly: true, sourceRange: { path: configPath, startLine, endLine: startLine }, diagnostics: [], toolPolicy, effectiveToolPolicy: toolPolicy });
   }
   return { mcps, diagnostics };
 }

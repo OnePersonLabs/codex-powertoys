@@ -73,7 +73,7 @@ test("extension manifest registers inspector views and commands", async () => {
   assert.match(source, /🔌/);
   assert.match(source, /🧰/);
   assert.match(source, /🔨/);
-  assert.match(source, /🧠/);
+  assert.match(source, /💪/);
   assert.match(source, /visibleGroupKinds\(/);
   assert.match(source, /setExpansionContext/);
   assert.match(source, /copyRelativePath/);

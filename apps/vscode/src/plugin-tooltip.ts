@@ -3,7 +3,7 @@ import { tooltipPath } from "./resource-path.js";
 
 export type PluginTooltipRecord = Pick<
   PluginRecord,
-  "name" | "root" | "scope" | "version" | "enabled"
+  "name" | "root" | "scope" | "version" | "enabled" | "metadata"
 >;
 
 export function pluginTooltip(
@@ -16,5 +16,10 @@ export function pluginTooltip(
   ];
   if (plugin.version) lines.push(`Version: ${plugin.version}`);
   lines.push(`Status: ${plugin.enabled ? "enabled" : "disabled"}`);
+  const description =
+    plugin.metadata && typeof plugin.metadata.description === "string"
+      ? plugin.metadata.description
+      : undefined;
+  if (description) lines.push(`Description: ${description}`);
   return lines.join("\n");
 }

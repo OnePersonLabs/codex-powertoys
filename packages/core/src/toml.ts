@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { ConfigMutationResult, ConfigOverride, Diagnostic, McpRecord, PluginOverride, Scope, SourceRange } from "./types.js";
+import type { ConfigMutationResult, ConfigOverride, Diagnostic, McpRecord, McpToolPolicy, PluginOverride, Scope, SourceRange } from "./types.js";
 
 export interface TomlSection {
   header: string;
@@ -9,6 +9,69 @@ export interface TomlSection {
   endLine: number;
   values: Record<string, unknown>;
   raw: string[];
+}
+
+export interface McpPolicyOverlay {
+  pluginKey: string;
+  server: string;
+  policy: McpToolPolicy;
+  scope: Scope;
+  range: SourceRange;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const values = value.filter((item): item is string => typeof item === "string");
+  return values.length === value.length ? values : values.length ? values : [];
+}
+
+/** Normalizes policy keys from Codex TOML/JSON into a stable core shape. */
+export function parseMcpToolPolicy(config: Record<string, unknown>): McpToolPolicy | undefined {
+  const enabledTools = stringArray(config.enabled_tools);
+  const disabledTools = stringArray(config.disabled_tools);
+  const defaultApprovalMode = typeof config.default_tools_approval_mode === "string" ? config.default_tools_approval_mode : undefined;
+  const toolsValue = config.tools;
+  const tools: Record<string, { approvalMode?: string }> = {};
+  if (toolsValue && typeof toolsValue === "object" && !Array.isArray(toolsValue)) {
+    for (const [name, value] of Object.entries(toolsValue as Record<string, unknown>)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const approvalMode = typeof (value as Record<string, unknown>).approval_mode === "string" ? (value as Record<string, unknown>).approval_mode as string : undefined;
+      if (approvalMode !== undefined) tools[name] = { approvalMode };
+    }
+  }
+  if (enabledTools === undefined && disabledTools === undefined && defaultApprovalMode === undefined && !Object.keys(tools).length) return undefined;
+  return { enabledTools, disabledTools, defaultApprovalMode, tools: Object.keys(tools).length ? tools : undefined };
+}
+
+export function mergeMcpToolPolicy(base: McpToolPolicy | undefined, overlay: McpToolPolicy | undefined): McpToolPolicy | undefined {
+  if (!base && !overlay) return undefined;
+  const tools = { ...(base?.tools ?? {}), ...(overlay?.tools ?? {}) };
+  return {
+    enabledTools: overlay?.enabledTools ?? base?.enabledTools,
+    disabledTools: overlay?.disabledTools ?? base?.disabledTools,
+    defaultApprovalMode: overlay?.defaultApprovalMode ?? base?.defaultApprovalMode,
+    tools: Object.keys(tools).length ? tools : undefined,
+  };
+}
+
+/** Reads plugin MCP policy tables without importing or changing plugin transport definitions. */
+export function parseMcpPolicyOverlays(text: string, path: string, scope: Scope): McpPolicyOverlay[] {
+  const sections = parseSections(text);
+  const roots = sections.filter((section) => section.path[0] === "plugins" && section.path[2] === "mcp_servers" && section.path.length >= 4);
+  const grouped = new Map<string, { pluginKey: string; server: string; raw: Record<string, unknown>; scope: Scope; range: SourceRange }>();
+  for (const section of roots) {
+    const pluginKey = section.path[1] ?? "";
+    const server = section.path[3] ?? "";
+    const key = `${pluginKey}\u0000${server}`;
+    const existing = grouped.get(key);
+    const policyObject = existing?.raw ?? {};
+    const relative = section.path.slice(4);
+    let target = policyObject;
+    for (const part of relative) target = (target[part] ??= {}) as Record<string, unknown>;
+    for (const [name, value] of Object.entries(section.values)) if (name !== "__array") target[name] = value;
+    grouped.set(key, { pluginKey, server, raw: policyObject, scope, range: { path, startLine: existing?.range.startLine ?? section.startLine, endLine: Math.max(existing?.range.endLine ?? section.endLine, section.endLine) } });
+  }
+  return [...grouped.values()].map(({ pluginKey, server, raw, scope, range }) => ({ pluginKey, server, policy: parseMcpToolPolicy(raw) ?? {}, scope, range }));
 }
 
 export function parseTomlValue(value: string): unknown {
@@ -97,7 +160,8 @@ export function parseMcpSections(text: string, configPath: string, scope: Scope)
     for (const nested of sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name && candidate.path.length > 2)) {
       let target = config; const parts = nested.path.slice(2); for (const part of parts) target = (target[part] ??= {}) as Record<string, unknown>; for (const [key, value] of Object.entries(nested.values)) if (key !== "__array") target[key] = value;
     }
-    return { id: `${scope}:${configPath}:${name}`, name, scope, sourceKind: "config", configPath, config, enabled: config.enabled !== false, pluginEnabled: true, effective: config.enabled === false ? "disabled" : "active", explicitEnabled: typeof config.enabled === "boolean" ? config.enabled : undefined, sourceRange: { path: configPath, startLine: section.startLine, endLine: Math.max(section.endLine, ...sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name).map((candidate) => candidate.endLine)) }, diagnostics: [] };
+    const toolPolicy = parseMcpToolPolicy(config);
+    return { id: `${scope}:${configPath}:${name}`, name, scope, sourceKind: "config", configPath, config, enabled: config.enabled !== false, pluginEnabled: true, effective: config.enabled === false ? "disabled" : "active", explicitEnabled: typeof config.enabled === "boolean" ? config.enabled : undefined, sourceRange: { path: configPath, startLine: section.startLine, endLine: Math.max(section.endLine, ...sections.filter((candidate) => candidate.path[0] === "mcp_servers" && candidate.path[1] === name).map((candidate) => candidate.endLine)) }, diagnostics: [], toolPolicy, effectiveToolPolicy: toolPolicy };
   });
 }
 
