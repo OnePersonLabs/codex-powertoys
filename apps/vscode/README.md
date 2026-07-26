@@ -1,6 +1,6 @@
 # Codex PowerToys VS Code Extension
 
-![demo](../../docs/resources/demo.gif)
+![demo](./resources/demo.gif)
 
 Codex PowerToys is a TypeScript monorepo for exploring Codex skills, plugin origins, subagent TOML files, and MCP configuration.
 
