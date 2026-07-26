@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit && esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
     "test": "tsx --test test/**/*.test.ts",
-    "vscode:prepublish": "pnpm build",
+    "vscode:prepublish": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
     "package": "pnpm build && npx @vscode/vsce package"
   },
   "devDependencies": {

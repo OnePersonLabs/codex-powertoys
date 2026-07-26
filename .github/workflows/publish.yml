@@ -20,6 +20,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build workspace dependencies
+        run: pnpm build
+
       - name: Publish to VS Code Marketplace
         working-directory: apps/vscode
         run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
