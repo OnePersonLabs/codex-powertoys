@@ -18,4 +18,4 @@
 ## 4. Verification
 
 - [x] 4.1 Update/add unit and source-contract tests for group visibility, toggles, expansion defaults, and glyphs.
-- [ ] 4.2 Run package tests, TypeScript build, `pnpm run build-package-install`, then review the final diff and git state.
+- [x] 4.2 Run package tests, TypeScript build, `pnpm run build-package-install`, then review the final diff and git state.
