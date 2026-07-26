@@ -1,34 +1,4 @@
-## Purpose
-
-Define the dedicated resource panes and shared filtering, expansion, path-copy, and tooltip interactions.
-
-## Requirements
-
-### Requirement: Dedicated flat resource panes
-The extension SHALL expose dedicated Skills and MCP native TreeViews in addition to Resources and Agents. Skills and MCP panes SHALL show all discovered records for their type as flat, alphabetical lists, including plugin-owned records, and SHALL retain full selection, source-opening, enablement, inspection, tool-loading, and context-menu behavior applicable to the record.
-
-#### Scenario: Skills list
-- **WHEN** the Skills view is opened
-- **THEN** it shows a flat alphabetically ordered list of discovered skills with status and type icons, without source/group directory rows
-
-#### Scenario: MCP list
-- **WHEN** the MCP view is opened
-- **THEN** it shows a flat alphabetically ordered list of discovered MCPs with status and type icons, without plugin or config hierarchy rows
-
-#### Scenario: Pane item interaction
-- **WHEN** a user selects or right-clicks a skill or MCP in its dedicated pane
-- **THEN** the existing Info/source-opening, enable/disable/reset, edit/delete, explicit tool-loading, copy, move, rename, and delete actions remain available subject to the same plugin read-only protections
-
-### Requirement: Incremental pane filtering
-Resources, Skills, and MCP panes SHALL provide a toolbar filter input that applies case-insensitive matching to visible names and full canonical paths as the user types. Each pane SHALL provide an X/clear action while a filter is active, and clearing SHALL restore all records.
-
-#### Scenario: Live filtering
-- **WHEN** text is entered into a pane's filter input
-- **THEN** the pane refreshes to show only matching records and retains required ancestor groups in Resources
-
-#### Scenario: Clear filtering
-- **WHEN** the user invokes the filter clear action
-- **THEN** the input and provider filter become empty and all records are visible again
+## MODIFIED Requirements
 
 ### Requirement: Stateful tree expansion controls
 Resources SHALL use a per-node expansion state. On initial materialization, roots, groups, plugins, MCP containers, and ordinary supporting directories SHALL be expanded, while individual skill nodes and their supporting entries SHALL be collapsed. Resources SHALL expose a title action whose label and behavior reflect the current state; Agents SHALL retain their existing expansion controls.
@@ -49,21 +19,6 @@ Resources SHALL use a per-node expansion state. On initial materialization, root
 - **WHEN** all non-skill Resources nodes are expanded but one or more individual skill nodes are collapsed
 - **THEN** the title action is Expand and invoking it expands all known nodes, including individual skills and their supporting entries
 
-### Requirement: Copy full and workspace-relative paths
-Every item in Resources, Skills, MCPs, and Agents SHALL offer `Copy Full Path` and `Copy Relative Path` context actions. Full path copies the canonical source path. Relative path copies the path relative to the active workspace root using `/` separators; when no workspace is open it SHALL copy the full path.
-
-#### Scenario: Copy full path
-- **WHEN** the user chooses Copy Full Path for any tree item
-- **THEN** the item's canonical path is written to the VS Code clipboard
-
-#### Scenario: Copy relative path
-- **WHEN** the user chooses Copy Relative Path with an active workspace
-- **THEN** the item's canonical path relative to that workspace root is written to the clipboard
-
-#### Scenario: Relative path without workspace
-- **WHEN** the user chooses Copy Relative Path without an active workspace
-- **THEN** the full canonical path is written to the clipboard
-
 ### Requirement: Source-aware path tooltips
 All resource and agent items in every tree pane SHALL expose their source path in the hover tooltip, including plugin-owned resources and loaded MCP tools. Workspace-scoped items SHALL show a path relative to the active workspace when their source is inside it; global-scoped items and workspace-scoped sources outside the active workspace SHALL show their canonical absolute path. Plugin nodes SHALL identify the plugin by name.
 
@@ -78,6 +33,8 @@ All resource and agent items in every tree pane SHALL expose their source path i
 #### Scenario: Plugin tooltip identity
 - **WHEN** the user hovers a plugin node
 - **THEN** the tooltip identifies the plugin by name and includes its scope-aware root path
+
+## ADDED Requirements
 
 ### Requirement: Plugin manifest activation
 Plugin row activation and the Open Plugin Manifest context action SHALL open the plugin's `.codex-plugin/plugin.json` file using the discovered manifest path when available. If the manifest cannot be opened, the extension SHALL report the exact attempted path instead of silently doing nothing.

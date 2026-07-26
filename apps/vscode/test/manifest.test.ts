@@ -12,7 +12,12 @@ test("extension manifest registers inspector views and commands", async () => {
     icon: string;
     contributes: {
       views: Record<string, Array<{ id: string }>>;
-      commands: Array<{ command: string; title?: string; icon?: string }>;
+      commands: Array<{
+        command: string;
+        title?: string;
+        icon?: string;
+        enablement?: string;
+      }>;
     };
   };
   const source = await readFile(
@@ -69,8 +74,16 @@ test("extension manifest registers inspector views and commands", async () => {
   assert.match(source, /🧰/);
   assert.match(source, /🔨/);
   assert.match(source, /🧠/);
-  assert.match(source, /groupNode\(scope, "plugins"/);
+  assert.match(source, /visibleGroupKinds\(/);
   assert.match(source, /setExpansionContext/);
   assert.match(source, /copyRelativePath/);
   assert.match(source, /new ResourceDragController/);
+  const command = (name: string) =>
+    manifest.contributes.commands.find((item) => item.command === name);
+  assert.equal(command("codexPowerToys.plugin.enable")?.enablement, "!resourceEnabled");
+  assert.equal(command("codexPowerToys.plugin.disable")?.enablement, "resourceEnabled");
+  assert.equal(command("codexPowerToys.mcp.enableGlobal")?.enablement, "!resourceEnabled");
+  assert.equal(command("codexPowerToys.mcp.disableGlobal")?.enablement, "resourceEnabled");
+  assert.equal(command("codexPowerToys.skill.enableGlobal")?.enablement, "!resourceEnabled");
+  assert.equal(command("codexPowerToys.skill.disableGlobal")?.enablement, "resourceEnabled");
 });

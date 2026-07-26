@@ -13,12 +13,30 @@ test("resource provider preserves scope and plugin source hierarchy", async () =
   const source = await extensionSource();
   assert.match(source, /label: "Global — ~\//);
   assert.match(source, /label: `Workspace —/);
-  assert.match(source, /groupNode\(scope, "plugins"/);
-  assert.match(source, /groupNode\(scope, "mcps"/);
-  assert.match(source, /groupNode\(scope, "skills"/);
-  assert.match(source, /groupNode\(scope, "mcps", plugin\)/);
-  assert.match(source, /groupNode\(scope, "skills", plugin\)/);
+  assert.match(source, /visibleGroupKinds\(\{/);
+  assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind\)/);
+  assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind, plugin\)/);
   assert.match(source, /filteredPlugins\(node\.scope!/);
+});
+
+test("plugin nodes identify the plugin and delegate scope-aware tooltip paths", async () => {
+  const source = await extensionSource();
+  assert.match(source, /label: typedLabel\("plugin", plugin\.name, plugin\)/);
+  assert.match(source, /item\.tooltip = pluginTooltip\(node\.plugin, workspaceRoot\(\)\)/);
+  assert.match(source, /command: "codexPowerToys\.plugin\.openManifest"/);
+  assert.match(source, /function pluginManifestPath\(plugin: PluginRecord\)/);
+});
+
+test("resource groups and expansion state preserve skill-specific behavior", async () => {
+  const source = await extensionSource();
+  assert.match(source, /visibleGroupKinds\(/);
+  assert.match(source, /private readonly expansion = new ResourceExpansionState\(\)/);
+  assert.match(source, /resourceView\.onDidExpandElement/);
+  assert.match(source, /resourceView\.onDidCollapseElement/);
+  assert.match(source, /underSkill: true/);
+  assert.match(source, /tooltipPath\(path, node\.scope, workspaceRoot\(\)\)/);
+  assert.match(source, /resources\.setShowSupporting\(/);
+  assert.match(source, /if \(key === "Resources"\) void syncExpansionContexts\(\)/);
 });
 
 test("resource labels use status and type glyphs without native checkboxes", async () => {
