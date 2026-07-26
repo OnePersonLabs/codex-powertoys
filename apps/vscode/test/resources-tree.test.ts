@@ -13,11 +13,12 @@ test("resource provider preserves scope and plugin source hierarchy", async () =
   const source = await extensionSource();
   assert.match(source, /label: "Global — ~\//);
   assert.match(source, /label: `Workspace —/);
-  assert.match(source, /sourceNodeKind: "pluginRoot"/);
-  assert.match(source, /sourceNodeKind: "pluginSkills"/);
-  assert.match(source, /sourceNodeKind: "pluginMcp"/);
-  assert.match(source, /sourcePath: plugin\.mcpPath/);
-  assert.match(source, /skill\.plugin\?\.id === plugin\.id/);
+  assert.match(source, /groupNode\(scope, "plugins"/);
+  assert.match(source, /groupNode\(scope, "mcps"/);
+  assert.match(source, /groupNode\(scope, "skills"/);
+  assert.match(source, /groupNode\(scope, "mcps", plugin\)/);
+  assert.match(source, /groupNode\(scope, "skills", plugin\)/);
+  assert.match(source, /filteredPlugins\(node\.scope!/);
 });
 
 test("resource labels use status and type glyphs without native checkboxes", async () => {
@@ -31,6 +32,20 @@ test("MCP tools are attached only by explicit loading", async () => {
   const source = await extensionSource();
   assert.match(source, /command\("codexPowerToys\.mcp\.loadTools"/);
   assert.match(source, /resources\.setTools\(mcp, result\.tools\)/);
+  assert.match(source, /mcps\.setTools\(mcp, result\.tools\)/);
   assert.match(source, /kind: "mcpTool"/);
   assert.match(source, /command: "codexPowerToys\.showMcpTool"/);
+});
+
+test("flat panes, filters, path actions, and expansion state are wired", async () => {
+  const source = await extensionSource();
+  assert.match(source, /class FlatSkillsProvider/);
+  assert.match(source, /class FlatMcpProvider/);
+  assert.match(source, /this\.skills[\s\S]*\.map\(skillNode\)/);
+  assert.match(source, /this\.mcps[\s\S]*\.map\(mcpNode\)/);
+  assert.match(source, /onDidChangeValue/);
+  assert.match(source, /resource\.copyFullPath/);
+  assert.match(source, /resource\.copyRelativePath/);
+  assert.match(source, /private expanded = true/);
+  assert.match(source, /showCollapseAll: false/);
 });

@@ -6,7 +6,7 @@ Codex PowerToys is a TypeScript monorepo for exploring Codex skills, plugin orig
 
 - `@codex-powertoys/core` — discovery, effective-state analysis, TOML mutations, and explicit MCP tool loading.
 - `@codex-powertoys/cli` — `codex-inspect` commands for roots, skills, plugins, agents, MCPs, and resource transfers.
-- `codex-powertoys-vscode` — desktop VS Code Activity Bar views for unified Resources, Agents, and Info.
+- `codex-powertoys-vscode` — desktop VS Code Activity Bar views for Resources, Skills, MCPs, Agents, and Info.
 
 ## Development
 
@@ -36,7 +36,9 @@ Plugin manifests and plugin-owned resources are discovered from the Codex plugin
 
 ## VS Code workflows
 
-Open the **Codex PowerToys** Activity Bar container to use the unified Resources, Agents, and Info views. Resources has Global (`~/`) and Workspace roots and preserves physical source paths: standalone skills appear under their `.agents`/`.codex` roots, plugin skills under `skills/`, and plugin MCPs under `.mcp.json`. Rows use status glyphs followed by type icons (`🔌` plugin, `🧰` MCP, `🔨` tool, `🧠` skill). Toolbar actions use icons with hover tooltips. Resources and agents support multi-selection, context-menu cut/copy/paste, rename, delete, and native drag/drop. Move and delete operations use modal confirmations; paste conflicts offer skip, replace, decide-each, or cancel.
+Open the **Codex PowerToys** Activity Bar container to use the Resources, Skills, MCPs, Agents, and Info views. Resources has Global (`~/`) and Workspace roots; each scope contains Plugins, MCPs, and Skills groups, with plugin-owned MCPs and skills nested under their plugin. Skills and MCPs are also available as flat alphabetical panes. Every item keeps its canonical path in the tooltip, and filters match names and paths while typing.
+
+Rows use status glyphs followed by type icons (`🔌` plugin, `🧰` MCP, `🔨` tool, `🧠` skill). Resources and agents start fully expanded and their title action switches between Collapse All and Expand All. All panes support multi-selection, context-menu cut/copy/paste, rename, delete, native drag/drop, and Copy Full Path/Copy Relative Path. Relative paths use the active workspace root; without a workspace the full path is copied. Move and delete operations use modal confirmations; paste conflicts offer skip, replace, decide-each, or cancel.
 
 The Agents view starts with expanded global (`~/.codex/agents`) and workspace (`.codex/agents`) roots and preserves relative paths during transfers. Plugin entries expose metadata, enable/disable/reset actions, manifests, and child resources while keeping the plugin cache immutable. MCP tools are loaded only when **Load MCP Tools** is explicitly invoked.
 

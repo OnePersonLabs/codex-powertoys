@@ -51,6 +51,16 @@
           "icon": "resources/codex-powertoys-icon-activity-bar.svg"
         },
         {
+          "id": "codexPowerToys.skills",
+          "name": "Skills",
+          "icon": "resources/codex-powertoys-icon-activity-bar.svg"
+        },
+        {
+          "id": "codexPowerToys.mcps",
+          "name": "MCPs",
+          "icon": "resources/codex-powertoys-icon-activity-bar.svg"
+        },
+        {
           "id": "codexPowerToys.agents",
           "name": "Agents",
           "icon": "resources/codex-powertoys-icon-activity-bar.svg"
@@ -76,8 +86,53 @@
       },
       {
         "command": "codexPowerToys.skills.filter",
+        "title": "Filter Skills",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "codexPowerToys.resources.filter",
         "title": "Filter Resources",
         "icon": "$(filter)"
+      },
+      {
+        "command": "codexPowerToys.resources.clearFilter",
+        "title": "Clear Resource Filter",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codexPowerToys.skills.clearFilter",
+        "title": "Clear Skill Filter",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codexPowerToys.mcp.filter",
+        "title": "Filter MCPs",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "codexPowerToys.mcp.clearFilter",
+        "title": "Clear MCP Filter",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codexPowerToys.resources.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codexPowerToys.resources.expandAll",
+        "title": "Expand All",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codexPowerToys.agents.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codexPowerToys.agents.expandAll",
+        "title": "Expand All",
+        "icon": "$(expand-all)"
       },
       {
         "command": "codexPowerToys.startSkillCreator",
@@ -122,6 +177,16 @@
       {
         "command": "codexPowerToys.resource.copy",
         "title": "Copy Resource",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "codexPowerToys.resource.copyFullPath",
+        "title": "Copy Full Path",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "codexPowerToys.resource.copyRelativePath",
+        "title": "Copy Relative Path",
         "icon": "$(copy)"
       },
       {
@@ -215,8 +280,28 @@
       "view/title": [
         {
           "command": "codexPowerToys.refresh",
-          "when": "view == codexPowerToys.resources || view == codexPowerToys.agents",
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents",
           "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.resources.collapseAll",
+          "when": "view == codexPowerToys.resources && codexPowerToys.resourcesTreeExpanded",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codexPowerToys.resources.expandAll",
+          "when": "view == codexPowerToys.resources && !codexPowerToys.resourcesTreeExpanded",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codexPowerToys.agents.collapseAll",
+          "when": "view == codexPowerToys.agents && codexPowerToys.agentsTreeExpanded",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codexPowerToys.agents.expandAll",
+          "when": "view == codexPowerToys.agents && !codexPowerToys.agentsTreeExpanded",
+          "group": "navigation@1"
         },
         {
           "command": "codexPowerToys.skills.toggleSupporting",
@@ -224,8 +309,33 @@
           "group": "navigation"
         },
         {
-          "command": "codexPowerToys.skills.filter",
+          "command": "codexPowerToys.resources.filter",
           "when": "view == codexPowerToys.resources",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.resources.clearFilter",
+          "when": "view == codexPowerToys.resources && codexPowerToys.resourcesFilterActive",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.skills.filter",
+          "when": "view == codexPowerToys.skills",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.skills.clearFilter",
+          "when": "view == codexPowerToys.skills && codexPowerToys.skillsFilterActive",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.mcp.filter",
+          "when": "view == codexPowerToys.mcps",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.mcp.clearFilter",
+          "when": "view == codexPowerToys.mcps && codexPowerToys.mcpsFilterActive",
           "group": "navigation"
         },
         {
@@ -235,7 +345,7 @@
         },
         {
           "command": "codexPowerToys.mcp.add",
-          "when": "view == codexPowerToys.resources",
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.mcps",
           "group": "navigation"
         },
         {
@@ -247,51 +357,59 @@
       "view/item/context": [
         {
           "command": "codexPowerToys.resource.cut",
-          "when": "(view == codexPowerToys.resources || view == codexPowerToys.agents) && viewItem != codexRoot && viewItem != codexPlugin"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents) && viewItem != codexRoot && viewItem != codexPlugin && viewItem != codexResourceGroup"
         },
         {
           "command": "codexPowerToys.resource.copy",
-          "when": "view == codexPowerToys.resources || view == codexPowerToys.agents"
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
+        },
+        {
+          "command": "codexPowerToys.resource.copyFullPath",
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
+        },
+        {
+          "command": "codexPowerToys.resource.copyRelativePath",
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
         },
         {
           "command": "codexPowerToys.resource.paste",
-          "when": "view == codexPowerToys.resources || view == codexPowerToys.agents"
+          "when": "view == codexPowerToys.resources || view == codexPowerToys.skills || view == codexPowerToys.mcps || view == codexPowerToys.agents"
         },
         {
           "command": "codexPowerToys.resource.rename",
-          "when": "viewItem == codexSkill || viewItem == codexMcp || viewItem == codexAgent"
+          "when": "viewItem == codexSkill || viewItem == codexPluginSkill || viewItem == codexMcp || viewItem == codexPluginMcp || viewItem == codexAgent"
         },
         {
           "command": "codexPowerToys.resource.delete",
-          "when": "viewItem == codexSkill || viewItem == codexMcp || viewItem == codexAgent || viewItem == codexAgentDir"
+          "when": "viewItem == codexSkill || viewItem == codexPluginSkill || viewItem == codexMcp || viewItem == codexPluginMcp || viewItem == codexAgent || viewItem == codexAgentDir"
         },
         {
           "command": "codexPowerToys.mcp.edit",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp)"
         },
         {
           "command": "codexPowerToys.mcp.delete",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp)"
         },
         {
           "command": "codexPowerToys.mcp.loadTools",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp)"
         },
         {
           "command": "codexPowerToys.mcp.enableGlobal",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp && resourceScope == global"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp) && resourceScope == global"
         },
         {
           "command": "codexPowerToys.mcp.disableGlobal",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp && resourceScope == global"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp) && resourceScope == global"
         },
         {
           "command": "codexPowerToys.mcp.enableLocal",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp && resourceScope == workspace"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp) && resourceScope == workspace"
         },
         {
           "command": "codexPowerToys.mcp.disableLocal",
-          "when": "view == codexPowerToys.resources && viewItem == codexMcp && resourceScope == workspace"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.mcps) && (viewItem == codexMcp || viewItem == codexPluginMcp) && resourceScope == workspace"
         },
         {
           "command": "codexPowerToys.plugin.enable",
@@ -315,27 +433,27 @@
         },
         {
           "command": "codexPowerToys.skill.enableGlobal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
         },
         {
           "command": "codexPowerToys.skill.disableGlobal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
         },
         {
           "command": "codexPowerToys.skill.resetGlobal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == global"
         },
         {
           "command": "codexPowerToys.skill.enableLocal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
         },
         {
           "command": "codexPowerToys.skill.disableLocal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
         },
         {
           "command": "codexPowerToys.skill.resetLocal",
-          "when": "view == codexPowerToys.resources && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
+          "when": "(view == codexPowerToys.resources || view == codexPowerToys.skills) && (viewItem == codexSkill || viewItem == codexPluginSkill) && resourceScope == workspace"
         }
       ]
     }

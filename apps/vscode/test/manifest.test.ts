@@ -26,6 +26,8 @@ test("extension manifest registers inspector views and commands", async () => {
   );
   assert.deepEqual(views, [
     "codexPowerToys.resources",
+    "codexPowerToys.skills",
+    "codexPowerToys.mcps",
     "codexPowerToys.agents",
     "codexPowerToys.info",
   ]);
@@ -34,6 +36,8 @@ test("extension manifest registers inspector views and commands", async () => {
       "codexPowerToys.refresh",
       "codexPowerToys.skills.toggleSupporting",
       "codexPowerToys.skills.filter",
+      "codexPowerToys.resources.filter",
+      "codexPowerToys.mcp.filter",
       "codexPowerToys.startSkillCreator",
       "codexPowerToys.mcp.add",
       "codexPowerToys.info.toggleExpand",
@@ -47,13 +51,26 @@ test("extension manifest registers inspector views and commands", async () => {
       (command) => command.command === "codexPowerToys.resource.paste",
     ),
   );
+  for (const command of [
+    "codexPowerToys.resource.copyFullPath",
+    "codexPowerToys.resource.copyRelativePath",
+    "codexPowerToys.resources.collapseAll",
+    "codexPowerToys.resources.expandAll",
+    "codexPowerToys.agents.collapseAll",
+    "codexPowerToys.agents.expandAll",
+  ])
+    assert.ok(manifest.contributes.commands.some((item) => item.command === command));
   assert.match(source, /canSelectMany:\s*true/);
   assert.match(source, /createTreeView\("codexPowerToys.resources"/);
+  assert.match(source, /createTreeView\("codexPowerToys.skills"/);
+  assert.match(source, /createTreeView\("codexPowerToys.mcps"/);
   assert.doesNotMatch(source, /TreeItemCheckboxState|checkboxState/);
   assert.match(source, /🔌/);
   assert.match(source, /🧰/);
   assert.match(source, /🔨/);
   assert.match(source, /🧠/);
-  assert.match(source, /sourceNodeKind: "pluginMcp"/);
+  assert.match(source, /groupNode\(scope, "plugins"/);
+  assert.match(source, /setExpansionContext/);
+  assert.match(source, /copyRelativePath/);
   assert.match(source, /new ResourceDragController/);
 });
