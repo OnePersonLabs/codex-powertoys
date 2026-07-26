@@ -81,7 +81,7 @@ test("plugin list exposes ownership and disabled state", async () => {
     "cache",
     "source",
     "demo",
-    "1.0.2",
+    "1.0.3",
   );
   await mkdir(resolve(pluginRoot, ".codex-plugin"), { recursive: true });
   await mkdir(workspace, { recursive: true });

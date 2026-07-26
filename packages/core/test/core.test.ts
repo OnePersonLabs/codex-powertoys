@@ -40,7 +40,7 @@ async function fixture() {
       "cache",
       "source",
       "plugin",
-      "1.0.2",
+      "1.0.3",
       ".codex-plugin",
     ),
     { recursive: true },
@@ -52,7 +52,7 @@ async function fixture() {
       "cache",
       "source",
       "plugin",
-      "1.0.2",
+      "1.0.3",
       "skills",
       "alpha",
     ),
@@ -81,7 +81,7 @@ async function fixture() {
     "cache",
     "source",
     "plugin",
-    "1.0.2",
+    "1.0.3",
   );
   const pluginSkill = join(pluginRoot, "skills", "alpha", "SKILL.md");
   await writeFile(pluginSkill, "---\nname: alpha\n---\nPlugin skill\n");
@@ -89,7 +89,7 @@ async function fixture() {
     join(pluginRoot, ".codex-plugin", "plugin.json"),
     JSON.stringify({
       name: "plugin",
-      version: "1.0.2",
+      version: "1.0.3",
       skills: "./skills",
       mcpServers: "./plugin-mcp.json",
     }),
@@ -518,7 +518,7 @@ test("workspace plugin MCP outranks a global config MCP", async () => {
     ".codex",
     "plugins",
     "workspace-mcp",
-    "1.0.2",
+    "1.0.3",
   );
   await mkdir(join(workspacePlugin, ".codex-plugin"), { recursive: true });
   await writeFile(
@@ -554,7 +554,7 @@ test("disabled workspace plugin contributions block lower-precedence resources",
     ".codex",
     "plugins",
     "workspace-blocker",
-    "1.0.2",
+    "1.0.3",
   );
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
   await mkdir(join(pluginRoot, "skills", "blocked-skill"), { recursive: true });
