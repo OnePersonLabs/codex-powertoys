@@ -6,6 +6,7 @@ import { pluginTooltip } from "./plugin-tooltip.js";
 import {
   ResourceExpansionState,
   type ExpansionAction,
+  type ExpansionNode,
 } from "./resource-expansion.js";
 import { McpToolCache, type McpToolCacheEntry } from "./mcp-tool-cache.js";
 import { resourceGroupLabel, visibleGroupKinds } from "./resource-groups.js";
@@ -199,6 +200,16 @@ function nodeIsNestedResource(node: Node): boolean {
     Boolean(node.underSkill) ||
     Boolean(node.underMcp)
   );
+}
+
+function resourcesExpansionNode(node: Node): ExpansionNode {
+  const root = node.kind === "root";
+  return {
+    id: nodeKey(node),
+    root,
+    skillRelated: node.kind === "skill" || Boolean(node.underSkill),
+    initiallyExpanded: root,
+  };
 }
 
 function toolPermissionGlyph(tool: McpTool): ToolPermissionGlyph {
@@ -401,7 +412,6 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     this.mcps = mcps.mcps;
     this.agents = agents.agents;
     this.expansion.reset();
-    this.updatePotentialSkillCount();
     this.tools.clear();
     this.emitter.fire(undefined);
   }
@@ -409,30 +419,24 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   setFilter(value: string): void {
     this.filter = value;
     this.expansion.resetMaterializedNodes();
-    this.updatePotentialSkillCount();
     this.emitter.fire(undefined);
   }
 
   setShowSupporting(value: boolean): void {
     this.showSupporting = value;
     this.expansion.resetMaterializedNodes();
-    this.updatePotentialSkillCount();
     this.emitter.fire(undefined);
   }
 
   setShowSuperseded(value: boolean): void {
     this.showSuperseded = value;
     this.expansion.resetMaterializedNodes();
-    this.updatePotentialSkillCount();
     this.emitter.fire(undefined);
   }
 
   setNodeExpanded(node: Node, expanded: boolean): void {
     if (!nodeIsExpandable(node, this.showSupporting, true)) return;
-    this.expansion.setNodeExpanded(
-      { id: nodeKey(node), nestedResource: nodeIsNestedResource(node) },
-      expanded,
-    );
+    this.expansion.setNodeExpanded(resourcesExpansionNode(node), expanded);
   }
 
   applyExpansion(action: ExpansionAction): void {
@@ -462,10 +466,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
 
   getTreeItem(node: Node): vscode.TreeItem {
     const expanded = nodeIsExpandable(node, this.showSupporting, true)
-      ? this.expansion.register({
-          id: nodeKey(node),
-          nestedResource: nodeIsNestedResource(node),
-        })
+      ? this.expansion.register(resourcesExpansionNode(node))
       : true;
     return createTreeItem(node, expanded, this.showSupporting, true);
   }
@@ -558,22 +559,6 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
         this.filteredMcps(scope, plugin).length > 0
       );
     });
-  }
-
-  private updatePotentialSkillCount(): void {
-    const skills = this.showSupporting
-      ? this.filteredSkills().filter(
-          (skill) =>
-            skill.supportingEntries.length > 0 &&
-            this.matches(skill.name, skill.skillPath),
-        ).length
-      : 0;
-    const mcps = this.mcps.filter(
-      (mcp) =>
-        (this.showSuperseded || mcp.effective !== "shadowed") &&
-        this.matches(mcp.name, mcp.configPath),
-    ).length;
-    this.expansion.setPotentialNestedCount(skills + mcps);
   }
 
   private groupPath(scope: Scope, kind: GroupKind, plugin?: PluginRecord): string | undefined {

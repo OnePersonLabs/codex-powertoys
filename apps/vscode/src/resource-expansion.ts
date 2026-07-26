@@ -1,42 +1,32 @@
 export type ExpansionNode = {
   id: string;
-  nestedResource?: boolean;
-  /** @deprecated Use nestedResource. Kept for existing callers. */
+  /** True for the Global and Workspace scope roots. */
+  root?: boolean;
+  /** True for a skill row or any supporting entry beneath a skill. */
   skillRelated?: boolean;
+  /** Legacy category used by dedicated panes for their initial defaults. */
+  nestedResource?: boolean;
+  /** Optional first-materialization override for providers with a custom policy. */
+  initiallyExpanded?: boolean;
 };
 
-export type ExpansionAction =
-  | "collapseAll"
-  | "expandNonSkills"
-  | "expandAll";
-
-type ExpansionMode = "default" | ExpansionAction | "manual";
+export type ExpansionAction = "collapseAll" | "expandNonSkills";
+type ExpansionPolicy = "collapsed" | "expandedNonSkills";
 
 export class ResourceExpansionState {
   private readonly nodes = new Map<string, ExpansionNode>();
   private readonly states = new Map<string, boolean>();
-  private potentialNestedCount = 0;
-  private mode: ExpansionMode = "default";
+  private policy: ExpansionPolicy = "collapsed";
 
   register(node: ExpansionNode): boolean {
     this.nodes.set(node.id, node);
-    if (!this.states.has(node.id))
-      this.states.set(node.id, this.defaultExpanded(node));
+    if (!this.states.has(node.id)) this.states.set(node.id, this.initialExpanded(node));
     return this.states.get(node.id)!;
-  }
-
-  setPotentialNestedCount(count: number): void {
-    this.potentialNestedCount = Math.max(0, count);
-  }
-
-  setPotentialSkillCount(count: number): void {
-    this.setPotentialNestedCount(count);
   }
 
   setNodeExpanded(node: ExpansionNode, expanded: boolean): void {
     this.register(node);
     this.states.set(node.id, expanded);
-    this.mode = "manual";
   }
 
   isExpanded(node: ExpansionNode): boolean {
@@ -44,18 +34,10 @@ export class ResourceExpansionState {
   }
 
   toolbarAction(): ExpansionAction {
-    const nodes = [...this.nodes.values()];
-    const nonNested = nodes.filter((node) => !this.isNestedResource(node));
-    const nested = nodes.filter((node) => this.isNestedResource(node));
-    const allNonNestedExpanded = nonNested.every((node) => this.isExpanded(node));
-    const allNestedExpanded =
-      this.potentialNestedCount <= nested.length &&
-      nested.every((node) => this.isExpanded(node));
-    if (!allNonNestedExpanded) return "expandNonSkills";
-    if (this.potentialNestedCount > 0 || nested.length > 0) {
-      if (!allNestedExpanded) return "expandAll";
+    for (const [id, node] of this.nodes) {
+      if (!node.root && this.states.get(id) === true) return "collapseAll";
     }
-    return "collapseAll";
+    return "expandNonSkills";
   }
 
   applyToolbarAction(): void {
@@ -63,33 +45,32 @@ export class ResourceExpansionState {
   }
 
   apply(action: ExpansionAction): void {
-    this.mode = action;
-    for (const node of this.nodes.values()) {
-      if (action === "collapseAll") this.states.set(node.id, false);
-      else if (action === "expandNonSkills") {
-        if (!this.isNestedResource(node)) this.states.set(node.id, true);
-      } else this.states.set(node.id, true);
+    this.policy = action === "collapseAll" ? "collapsed" : "expandedNonSkills";
+    for (const [id, node] of this.nodes) {
+      if (node.root) this.states.set(id, true);
+      else this.states.set(id, action === "expandNonSkills" && !this.isSkillRelated(node));
     }
   }
 
   reset(): void {
     this.nodes.clear();
     this.states.clear();
-    this.mode = "default";
+    this.policy = "collapsed";
   }
 
   resetMaterializedNodes(): void {
     this.nodes.clear();
   }
 
-  private defaultExpanded(node: ExpansionNode): boolean {
-    if (this.mode === "collapseAll") return false;
-    if (this.mode === "expandAll") return true;
-    if (this.mode === "expandNonSkills") return !this.isNestedResource(node);
-    return !this.isNestedResource(node);
+  private initialExpanded(node: ExpansionNode): boolean {
+    if (this.policy === "expandedNonSkills")
+      return node.root === true || !this.isSkillRelated(node);
+    if (node.initiallyExpanded !== undefined) return node.initiallyExpanded;
+    if (node.root) return true;
+    return !node.nestedResource;
   }
 
-  private isNestedResource(node: ExpansionNode): boolean {
-    return node.nestedResource ?? node.skillRelated ?? false;
+  private isSkillRelated(node: ExpansionNode): boolean {
+    return node.skillRelated === true;
   }
 }
