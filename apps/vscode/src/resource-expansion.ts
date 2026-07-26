@@ -4,6 +4,8 @@ export type ExpansionNode = {
   root?: boolean;
   /** True for a skill row or any supporting entry beneath a skill. */
   skillRelated?: boolean;
+  /** True for an MCP row or any supporting entry beneath an MCP. */
+  mcpRelated?: boolean;
   /** Legacy category used by dedicated panes for their initial defaults. */
   nestedResource?: boolean;
   /** Optional first-materialization override for providers with a custom policy. */
@@ -48,7 +50,10 @@ export class ResourceExpansionState {
     this.policy = action === "collapseAll" ? "collapsed" : "expandedNonSkills";
     for (const [id, node] of this.nodes) {
       if (node.root) this.states.set(id, true);
-      else this.states.set(id, action === "expandNonSkills" && !this.isSkillRelated(node));
+      else this.states.set(
+        id,
+        action === "expandNonSkills" && !this.isBulkExcluded(node),
+      );
     }
   }
 
@@ -64,13 +69,13 @@ export class ResourceExpansionState {
 
   private initialExpanded(node: ExpansionNode): boolean {
     if (this.policy === "expandedNonSkills")
-      return node.root === true || !this.isSkillRelated(node);
+      return node.root === true || !this.isBulkExcluded(node);
     if (node.initiallyExpanded !== undefined) return node.initiallyExpanded;
     if (node.root) return true;
     return !node.nestedResource;
   }
 
-  private isSkillRelated(node: ExpansionNode): boolean {
-    return node.skillRelated === true;
+  private isBulkExcluded(node: ExpansionNode): boolean {
+    return node.skillRelated === true || node.mcpRelated === true;
   }
 }

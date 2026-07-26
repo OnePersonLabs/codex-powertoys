@@ -7,7 +7,7 @@ import {
 
 const node = (
   id: string,
-  options: Pick<ExpansionNode, "root" | "skillRelated" | "initiallyExpanded"> = {},
+  options: Pick<ExpansionNode, "root" | "skillRelated" | "mcpRelated" | "initiallyExpanded"> = {},
 ): ExpansionNode => ({ id, ...options });
 
 test("Resources start with only Global and Workspace expanded", () => {
@@ -19,12 +19,13 @@ test("Resources start with only Global and Workspace expanded", () => {
   assert.equal(state.toolbarAction(), "expandNonSkills");
 });
 
-test("Expand opens non-skill nodes and keeps skill descendants collapsed", () => {
+test("Expand opens non-skill, non-MCP nodes and keeps skill/MCP descendants collapsed", () => {
   const state = new ResourceExpansionState();
   state.register(node("global", { root: true, initiallyExpanded: true }));
   state.register(node("workspace", { root: true, initiallyExpanded: true }));
   state.register(node("plugin", { initiallyExpanded: false }));
-  state.register(node("mcp", { initiallyExpanded: false }));
+  state.register(node("mcp", { mcpRelated: true, initiallyExpanded: false }));
+  state.register(node("mcp-tool", { mcpRelated: true, initiallyExpanded: false }));
   state.register(node("skill", { skillRelated: true, initiallyExpanded: false }));
   state.register(node("skill-entry", { skillRelated: true, initiallyExpanded: false }));
 
@@ -33,10 +34,36 @@ test("Expand opens non-skill nodes and keeps skill descendants collapsed", () =>
   assert.equal(state.isExpanded(node("global", { root: true })), true);
   assert.equal(state.isExpanded(node("workspace", { root: true })), true);
   assert.equal(state.isExpanded(node("plugin")), true);
-  assert.equal(state.isExpanded(node("mcp")), true);
+  assert.equal(state.isExpanded(node("mcp", { mcpRelated: true })), false);
+  assert.equal(state.isExpanded(node("mcp-tool", { mcpRelated: true })), false);
   assert.equal(state.isExpanded(node("skill", { skillRelated: true })), false);
   assert.equal(state.isExpanded(node("skill-entry", { skillRelated: true })), false);
   assert.equal(state.toolbarAction(), "collapseAll");
+});
+
+test("Manual MCP expansion updates the toolbar and Collapse All resets it", () => {
+  const state = new ResourceExpansionState();
+  const global = node("global", { root: true, initiallyExpanded: true });
+  const mcp = node("mcp", { mcpRelated: true, initiallyExpanded: false });
+  const tool = node("mcp-tool", { mcpRelated: true, initiallyExpanded: false });
+  state.register(global);
+  state.register(mcp);
+  state.register(tool);
+
+  state.applyToolbarAction();
+  assert.equal(state.isExpanded(mcp), false);
+  assert.equal(state.isExpanded(tool), false);
+  assert.equal(state.toolbarAction(), "expandNonSkills");
+
+  state.setNodeExpanded(mcp, true);
+  state.setNodeExpanded(tool, true);
+  assert.equal(state.toolbarAction(), "collapseAll");
+
+  state.applyToolbarAction();
+  assert.equal(state.isExpanded(global), true);
+  assert.equal(state.isExpanded(mcp), false);
+  assert.equal(state.isExpanded(tool), false);
+  assert.equal(state.toolbarAction(), "expandNonSkills");
 });
 
 test("Collapse closes every non-root node and re-expands roots", () => {
