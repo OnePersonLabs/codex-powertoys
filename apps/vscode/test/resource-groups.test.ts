@@ -23,11 +23,11 @@ test("plugin child groups omit only empty resource groups", () => {
   );
 });
 
-test("resource group labels use the stable type glyphs", () => {
-  assert.equal(resourceGroupLabel("plugins"), "🔌 Plugins");
-  assert.equal(resourceGroupLabel("mcps"), "🧰 MCPs");
-  assert.equal(resourceGroupLabel("skills"), "💪 Skills");
-  assert.equal(resourceGroupLabel("agents"), "🤖 Agents");
+test("resource group labels use plain type names", () => {
+  assert.equal(resourceGroupLabel("plugins"), "Plugins");
+  assert.equal(resourceGroupLabel("mcps"), "MCPs");
+  assert.equal(resourceGroupLabel("skills"), "Skills");
+  assert.equal(resourceGroupLabel("agents"), "Agents");
 });
 
 test("group visibility can omit every empty group", () => {

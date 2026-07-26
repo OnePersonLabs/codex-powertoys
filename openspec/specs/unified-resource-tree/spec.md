@@ -84,7 +84,7 @@ Resources SHALL label its two scope roots exactly `Global` and `Workspace`, with
 - **THEN** the top-level rows are labelled `Global` and `Workspace`, and hovering either row reveals its full root path
 
 ### Requirement: Preserve unified-tree interactions
-The unified view SHALL preserve applicable selection, inspection, mutation, transfer, and refresh behavior from the existing resource views.
+The unified view SHALL preserve applicable selection, inspection, mutation, transfer, and refresh behavior from the existing resource views. When a command is invoked from a tree item context menu, the command SHALL resolve the provider wrapper to the underlying skill, plugin, or MCP record before invoking core operations. Refresh commands SHALL invoke the normal refresh pipeline without treating incidental VS Code view arguments as MCP force-name state.
 
 #### Scenario: Resource inspection
 - **WHEN** a skill, plugin, MCP, agent, or loaded tool is selected
@@ -94,6 +94,16 @@ The unified view SHALL preserve applicable selection, inspection, mutation, tran
 - **WHEN** a user invokes an enable, disable, reset, rename, delete, copy, move, or paste command for an eligible resource
 - **THEN** the existing core mutation is invoked with the same scope and read-only protections, and the unified tree refreshes to show the resulting status/path
 
+#### Scenario: Wrapped resource mutation
+- **WHEN** a user invokes an enable, disable, reset, edit, delete, or tool-loading context action on a unified-tree skill, plugin, or MCP node
+- **THEN** the command operates on the underlying resource record embedded in that node
+- **AND** no wrapper-only fields are used as the resource name, source, path, scope, or configuration key
+
+#### Scenario: Toolbar refresh with a view argument
+- **WHEN** VS Code invokes the Resources or Agents refresh command from a view toolbar and supplies a view-related argument
+- **THEN** the command performs the normal refresh without throwing a `forceNames.has is not a function` error
+- **AND** explicit internal refresh calls may still force re-query for a supplied set of MCP names
+
 ### Requirement: Agents remain separate
 The extension SHALL keep Agents in a dedicated flat provider while also exposing scoped recursive Agents groups in Resources.
 
@@ -102,11 +112,15 @@ The extension SHALL keep Agents in a dedicated flat provider while also exposing
 - **THEN** Agents continue using a dedicated provider, while Resources also exposes scoped Agents groups and recursive agent children without duplicating scope-root rows inside the dedicated provider
 
 ### Requirement: Typed non-empty resource groups
-The Resources tree SHALL label Plugins, MCPs, Skills, and Agents group nodes with 🔌, 🧰, 💪, and 🤖 respectively, and SHALL omit any group whose visible children are empty after filtering and superseded-record visibility rules are applied.
+The Resources tree SHALL label Plugins, MCPs, Skills, and Agents group nodes with their plain names (`Plugins`, `MCPs`, `Skills`, and `Agents`) without a leading emoji, and SHALL omit any group whose visible children are empty after filtering and superseded-record visibility rules are applied. Resource item rows SHALL retain their existing status and type glyphs.
 
-#### Scenario: Typed scope and plugin groups
+#### Scenario: Plain typed scope and plugin groups
 - **WHEN** a scope or plugin has visible resources of a type
-- **THEN** its group label contains the corresponding type glyph before the group name
+- **THEN** its group label is exactly the corresponding plain name, without a leading emoji
+
+#### Scenario: Resource item glyphs remain present
+- **WHEN** the tree renders a plugin, skill, MCP, loaded MCP tool, or agent item
+- **THEN** the item retains its existing status/type glyph label
 
 #### Scenario: Empty plugin scope
 - **WHEN** a scope has no visible plugins
