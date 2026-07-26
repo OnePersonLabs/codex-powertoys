@@ -52,6 +52,8 @@ test("resource toolbar drives the native TreeView instead of only refreshing pro
   assert.match(source, /getParent\(node: Node\): Node \| undefined/);
   assert.match(source, /workbench\.actions\.treeView\.codexPowerToys\.resources\.collapseAll/);
   assert.match(source, /resourceView\.reveal\(/);
+  assert.match(source, /command\("codexPowerToys\.refresh", \(\) => refreshAll\(\)\)/);
+  assert.match(source, /command\("codexPowerToys\.refreshAgents", \(\) => refreshAll\(\)\)/);
 });
 
 test("resource labels use status and type glyphs without native checkboxes", async () => {
@@ -83,4 +85,6 @@ test("flat panes, filters, path actions, and expansion state are wired", async (
   assert.match(source, /resource\.copyFullPath/);
   assert.match(source, /resource\.copyRelativePath/);
   assert.match(source, /showCollapseAll: false/);
+  assert.match(source, /unwrapCommandTarget<PluginRecord>\(target, "plugin"\)/);
+  assert.match(source, /command\("codexPowerToys\.plugin\.disable", async \(target: unknown\) => \{[\s\S]*?const plugin = unwrapCommandTarget<PluginRecord>\(target, "plugin"\)/);
 });

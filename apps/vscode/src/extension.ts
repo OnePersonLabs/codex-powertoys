@@ -10,6 +10,7 @@ import {
 } from "./resource-expansion.js";
 import { McpToolCache, type McpToolCacheEntry } from "./mcp-tool-cache.js";
 import { resourceGroupLabel, visibleGroupKinds } from "./resource-groups.js";
+import { unwrapCommandTarget } from "./resource-command-target.js";
 import { tooltipPath } from "./resource-path.js";
 import {
   mcpToolTooltip,
@@ -1307,8 +1308,8 @@ export function activate(context: vscode.ExtensionContext): void {
   ): Promise<void> {
     await runTransfer(resources, "move", target);
   }
-  command("codexPowerToys.refresh", refreshAll);
-  command("codexPowerToys.refreshAgents", refreshAll);
+  command("codexPowerToys.refresh", () => refreshAll());
+  command("codexPowerToys.refreshAgents", () => refreshAll());
   command("codexPowerToys.openSkill", async (skill: SkillRecord) => {
     const document = await vscode.workspace.openTextDocument(
       vscode.Uri.file(skill.skillPath),
@@ -1387,7 +1388,9 @@ export function activate(context: vscode.ExtensionContext): void {
     await setExpansionContext("resources", resources.shouldShowCollapse());
   });
   const skillAction =
-    (scope: Scope, enabled: boolean) => async (skill: SkillRecord) => {
+    (scope: Scope, enabled: boolean) => async (target: unknown) => {
+      const skill = unwrapCommandTarget<SkillRecord>(target, "skill");
+      if (!skill) return;
       await setSkillEnabled(coreOptions(), skill.skillPath, scope, enabled);
       await refreshAll();
     };
@@ -1410,7 +1413,9 @@ export function activate(context: vscode.ExtensionContext): void {
     await addMcpDefinition(coreOptions(), "workspace", name, JSON.parse(raw));
     await refreshAll();
   });
-  command("codexPowerToys.mcp.edit", async (mcp: McpRecord) => {
+  command("codexPowerToys.mcp.edit", async (target: unknown) => {
+    const mcp = unwrapCommandTarget<McpRecord>(target, "mcp");
+    if (!mcp) return;
     if (mcp.readOnly)
       return vscode.window.showWarningMessage(
         "Plugin-owned MCPs are read-only; copy it to a managed config first.",
@@ -1429,7 +1434,9 @@ export function activate(context: vscode.ExtensionContext): void {
     );
     await refreshAll(new Set([mcp.name]));
   });
-  command("codexPowerToys.mcp.delete", async (mcp: McpRecord) => {
+  command("codexPowerToys.mcp.delete", async (target: unknown) => {
+    const mcp = unwrapCommandTarget<McpRecord>(target, "mcp");
+    if (!mcp) return;
     if (mcp.readOnly)
       return vscode.window.showWarningMessage(
         "Plugin-owned MCPs are read-only.",
@@ -1439,7 +1446,9 @@ export function activate(context: vscode.ExtensionContext): void {
     await deleteMcpDefinition(coreOptions(), mcp.scope, mcp.name);
     await refreshAll();
   });
-  command("codexPowerToys.mcp.loadTools", async (mcp: McpRecord) => {
+  command("codexPowerToys.mcp.loadTools", async (target: unknown) => {
+    const mcp = unwrapCommandTarget<McpRecord>(target, "mcp");
+    if (!mcp) return;
     info.show(mcp);
     if (!mcpToolCache.enqueue(mcp, true))
       vscode.window.showWarningMessage(
@@ -1456,24 +1465,34 @@ export function activate(context: vscode.ExtensionContext): void {
     ["enableLocal", "workspace", true],
     ["disableLocal", "workspace", false],
   ] as const)
-    command(`codexPowerToys.mcp.${name}`, async (mcp: McpRecord) => {
+    command(`codexPowerToys.mcp.${name}`, async (target: unknown) => {
+      const mcp = unwrapCommandTarget<McpRecord>(target, "mcp");
+      if (!mcp) return;
       if (mcp.readOnly) return;
       await setMcpState(coreOptions(), scope, mcp.name, enabled);
       await refreshAll(enabled ? new Set([mcp.name]) : new Set());
     });
-  command("codexPowerToys.plugin.enable", async (plugin: PluginRecord) => {
+  command("codexPowerToys.plugin.enable", async (target: unknown) => {
+    const plugin = unwrapCommandTarget<PluginRecord>(target, "plugin");
+    if (!plugin) return;
     await setPluginEnabled(coreOptions(), plugin, true, plugin.scope);
     await refreshAll(new Set(plugin.mcpNames));
   });
-  command("codexPowerToys.plugin.disable", async (plugin: PluginRecord) => {
+  command("codexPowerToys.plugin.disable", async (target: unknown) => {
+    const plugin = unwrapCommandTarget<PluginRecord>(target, "plugin");
+    if (!plugin) return;
     await setPluginEnabled(coreOptions(), plugin, false, plugin.scope);
     await refreshAll();
   });
-  command("codexPowerToys.plugin.reset", async (plugin: PluginRecord) => {
+  command("codexPowerToys.plugin.reset", async (target: unknown) => {
+    const plugin = unwrapCommandTarget<PluginRecord>(target, "plugin");
+    if (!plugin) return;
     await setPluginEnabled(coreOptions(), plugin, undefined, plugin.scope);
     await refreshAll();
   });
-  command("codexPowerToys.plugin.openManifest", async (plugin: PluginRecord) => {
+  command("codexPowerToys.plugin.openManifest", async (target: unknown) => {
+    const plugin = unwrapCommandTarget<PluginRecord>(target, "plugin");
+    if (!plugin) return;
     const manifestPath = pluginManifestPath(plugin);
     try {
       const document = await vscode.workspace.openTextDocument(
@@ -1488,12 +1507,14 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }
   });
-  command("codexPowerToys.plugin.openDirectory", (plugin: PluginRecord) =>
-    vscode.commands.executeCommand(
+  command("codexPowerToys.plugin.openDirectory", (target: unknown) => {
+    const plugin = unwrapCommandTarget<PluginRecord>(target, "plugin");
+    if (!plugin) return;
+    return vscode.commands.executeCommand(
       "revealInExplorer",
       vscode.Uri.file(plugin.root),
-    ),
-  );
+    );
+  });
   command(
     "codexPowerToys.resource.cut",
     (first?: Node, selected?: readonly Node[]) => {
