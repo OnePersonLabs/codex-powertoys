@@ -43,7 +43,7 @@ Resources, Plugins, Skills, and MCP panes SHALL provide a toolbar filter input t
 - **THEN** the input and provider filter become empty and all records are visible again
 
 ### Requirement: Stateful tree expansion controls
-Resources SHALL use a per-node expansion state. On initial materialization, roots, groups, plugins, and ordinary supporting directories SHALL be expanded, while individual skill and MCP nodes and their supporting/tool entries SHALL be collapsed. Dedicated Plugins and Skills providers SHALL initialize each resource row collapsed and preserve expansion only for that provider until refresh. Agents SHALL remain a flat list without scope-root expansion controls.
+Resources SHALL use a per-node expansion state. On initial materialization, roots, groups, and ordinary supporting directories SHALL be expanded, while plugin rows, individual skill and MCP nodes, and their supporting/tool entries SHALL be collapsed. Dedicated Plugins and Skills providers SHALL initialize each resource row collapsed and preserve expansion only for that provider until refresh. Agents SHALL remain a flat list without scope-root expansion controls.
 
 #### Scenario: Skill-specific default expansion
 - **WHEN** Resources is first opened or refreshed
@@ -132,3 +132,21 @@ Enable and Disable context commands for plugins, MCPs, and skills SHALL use the 
 #### Scenario: Disabled item
 - **WHEN** a disabled or unavailable plugin, MCP, or skill is selected
 - **THEN** its Disable command is disabled and its Enable command remains enabled
+
+### Requirement: Per-pane superseded toggle
+The Plugins, MCPs, Skills, and Resources panes SHALL each provide an independent toolbar toggle for showing or hiding superseded records. The Agents pane SHALL not provide this toggle.
+
+#### Scenario: Toggle in applicable panes
+- **WHEN** the user invokes a pane's superseded toggle
+- **THEN** only that pane changes whether records with effective state `shadowed` are rendered
+
+#### Scenario: No Agents toggle
+- **WHEN** the Agents pane is opened
+- **THEN** no superseded visibility command is contributed to that pane
+
+### Requirement: Collapsed Resources plugin defaults
+Resource plugin nodes SHALL be collapsed on initial materialization and after refresh, while roots and type groups retain their existing expanded defaults.
+
+#### Scenario: Plugin rows start collapsed
+- **WHEN** Resources first materializes a plugin node
+- **THEN** the plugin node is collapsible and its initial state is Collapsed

@@ -8,7 +8,7 @@ import {
   type ExpansionAction,
 } from "./resource-expansion.js";
 import { McpToolCache, type McpToolCacheEntry } from "./mcp-tool-cache.js";
-import { visibleGroupKinds } from "./resource-groups.js";
+import { resourceGroupLabel, visibleGroupKinds } from "./resource-groups.js";
 import { tooltipPath } from "./resource-path.js";
 import {
   mcpToolTooltip,
@@ -97,7 +97,7 @@ function statusGlyph(value: SkillRecord | McpRecord | PluginRecord): string {
     ? value.state.effective
     : value.effective;
   if (effective === "active") return "✅";
-  if (effective === "shadowed") return "☑️";
+  if (effective === "shadowed") return "✖️";
   if (value.scope === "workspace" && "enabled" in value && value.enabled === false) return "✖️";
   if ("state" in value && value.state.workspace === "disabled" && value.state.global !== "disabled") return "✖️";
   return "❌";
@@ -192,6 +192,7 @@ function nodeKey(node: Node): string {
 
 function nodeIsNestedResource(node: Node): boolean {
   return (
+    node.kind === "plugin" ||
     node.kind === "skill" ||
     node.kind === "mcp" ||
     node.kind === "mcpTool" ||
@@ -249,6 +250,10 @@ function nodeContextValue(node: Node): string {
   if (node.kind === "root") return "codexRoot";
   if (node.kind === "group") return "codexResourceGroup";
   return node.kind;
+}
+
+function groupLabel(kind: GroupKind): string {
+  return resourceGroupLabel(kind);
 }
 
 function createTreeItem(
@@ -378,6 +383,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   agents: AgentRecord[] = [];
   roots?: RootSet;
   showSupporting = true;
+  showSuperseded = true;
   filter = "";
   private readonly expansion = new ResourceExpansionState();
   private readonly tools = new Map<string, McpTool[]>();
@@ -409,6 +415,13 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
 
   setShowSupporting(value: boolean): void {
     this.showSupporting = value;
+    this.expansion.resetMaterializedNodes();
+    this.updatePotentialSkillCount();
+    this.emitter.fire(undefined);
+  }
+
+  setShowSuperseded(value: boolean): void {
+    this.showSuperseded = value;
     this.expansion.resetMaterializedNodes();
     this.updatePotentialSkillCount();
     this.emitter.fire(undefined);
@@ -515,6 +528,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   private filteredSkills(scope?: Scope, plugin?: PluginRecord): SkillRecord[] {
     return this.skills.filter(
       (skill) =>
+        (this.showSuperseded || skill.state.effective !== "shadowed") &&
         (!scope || skill.scope === scope) &&
         (!plugin ? !skill.plugin : skill.plugin?.id === plugin.id) &&
         this.matches(skill.name, skill.skillPath),
@@ -524,6 +538,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   private filteredMcps(scope?: Scope, plugin?: PluginRecord): McpRecord[] {
     return this.mcps.filter(
       (mcp) =>
+        (this.showSuperseded || mcp.effective !== "shadowed") &&
         (!scope || mcp.scope === scope) &&
         (!plugin ? !mcp.plugin : mcp.plugin?.id === plugin.id) &&
         this.matches(mcp.name, mcp.configPath),
@@ -536,7 +551,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
 
   private filteredPlugins(scope: Scope): PluginRecord[] {
     return this.plugins.filter((plugin) => {
-      if (plugin.scope !== scope) return false;
+      if (plugin.scope !== scope || (!this.showSuperseded && plugin.effective === "shadowed")) return false;
       if (this.matches(plugin.name, plugin.root)) return true;
       return (
         this.filteredSkills(scope, plugin).length > 0 ||
@@ -547,14 +562,16 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
 
   private updatePotentialSkillCount(): void {
     const skills = this.showSupporting
-      ? this.skills.filter(
+      ? this.filteredSkills().filter(
           (skill) =>
             skill.supportingEntries.length > 0 &&
             this.matches(skill.name, skill.skillPath),
         ).length
       : 0;
-    const mcps = this.mcps.filter((mcp) =>
-      this.matches(mcp.name, mcp.configPath),
+    const mcps = this.mcps.filter(
+      (mcp) =>
+        (this.showSuperseded || mcp.effective !== "shadowed") &&
+        this.matches(mcp.name, mcp.configPath),
     ).length;
     this.expansion.setPotentialNestedCount(skills + mcps);
   }
@@ -588,7 +605,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
   ): Node {
     return {
       kind: "group",
-      label: kind === "plugins" ? "Plugins" : kind === "mcps" ? "MCPs" : kind === "skills" ? "Skills" : "Agents",
+      label: groupLabel(kind),
       scope,
       targetPath: this.groupPath(scope, kind, plugin),
       groupKind: kind,
@@ -598,7 +615,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
 
   private scopeGroups(scope: Scope): Node[] {
     const groups = visibleGroupKinds({
-      plugins: true,
+      plugins: this.filteredPlugins(scope).length > 0,
       mcps: this.filteredMcps(scope).length > 0,
       skills: this.filteredSkills(scope).length > 0,
     }).map((kind) => this.groupNode(scope, kind));
@@ -644,6 +661,7 @@ class FlatSkillsProvider implements vscode.TreeDataProvider<Node> {
   readonly emitter = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this.emitter.event;
   skills: SkillRecord[] = [];
+  showSuperseded = true;
   filter = "";
   private readonly expansion = new ResourceExpansionState();
   async refresh(): Promise<void> {
@@ -653,6 +671,11 @@ class FlatSkillsProvider implements vscode.TreeDataProvider<Node> {
   }
   setFilter(value: string): void {
     this.filter = value;
+    this.expansion.resetMaterializedNodes();
+    this.emitter.fire(undefined);
+  }
+  setShowSuperseded(value: boolean): void {
+    this.showSuperseded = value;
     this.expansion.resetMaterializedNodes();
     this.emitter.fire(undefined);
   }
@@ -686,7 +709,10 @@ class FlatSkillsProvider implements vscode.TreeDataProvider<Node> {
     if (node) return [];
     const filter = this.filter.toLowerCase();
     return this.skills
-      .filter((skill) => !filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter))
+      .filter((skill) =>
+        (this.showSuperseded || skill.state.effective !== "shadowed") &&
+        (!filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter)),
+      )
       .map(skillNode);
   }
 }
@@ -697,6 +723,7 @@ class FlatPluginsProvider implements vscode.TreeDataProvider<Node> {
   plugins: PluginRecord[] = [];
   skills: SkillRecord[] = [];
   mcps: McpRecord[] = [];
+  showSuperseded = true;
   filter = "";
   private readonly expansion = new ResourceExpansionState();
   private readonly tools = new Map<string, McpTool[]>();
@@ -730,6 +757,11 @@ class FlatPluginsProvider implements vscode.TreeDataProvider<Node> {
     this.expansion.resetMaterializedNodes();
     this.emitter.fire(undefined);
   }
+  setShowSuperseded(value: boolean): void {
+    this.showSuperseded = value;
+    this.expansion.resetMaterializedNodes();
+    this.emitter.fire(undefined);
+  }
 
   setNodeExpanded(node: Node, expanded: boolean): void {
     if (!nodeIsExpandable(node, true, true)) return;
@@ -748,19 +780,41 @@ class FlatPluginsProvider implements vscode.TreeDataProvider<Node> {
     if (!node) {
       const filter = this.filter.toLowerCase();
       return this.plugins
-        .filter((plugin) => !filter || `${plugin.name} ${plugin.root}`.toLowerCase().includes(filter) || this.skills.some((skill) => skill.plugin?.id === plugin.id && `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter)) || this.mcps.some((mcp) => mcp.plugin?.id === plugin.id && `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter)))
+        .filter((plugin) =>
+          (this.showSuperseded || plugin.effective !== "shadowed") &&
+          (!filter || `${plugin.name} ${plugin.root}`.toLowerCase().includes(filter) ||
+            this.skills.some((skill) =>
+              skill.plugin?.id === plugin.id &&
+              (this.showSuperseded || skill.state.effective !== "shadowed") &&
+              `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter),
+            ) ||
+            this.mcps.some((mcp) =>
+              mcp.plugin?.id === plugin.id &&
+              (this.showSuperseded || mcp.effective !== "shadowed") &&
+              `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter),
+            )),
+        )
         .sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root))
         .map(pluginNode);
     }
     if (node.kind === "plugin" && node.plugin) {
       const plugin = node.plugin;
-      const skills = this.skills.filter((skill) => skill.plugin?.id === plugin.id);
-      const mcps = this.mcps.filter((mcp) => mcp.plugin?.id === plugin.id);
+      const filter = this.filter.toLowerCase();
+      const skills = this.skills.filter((skill) =>
+        skill.plugin?.id === plugin.id &&
+        (this.showSuperseded || skill.state.effective !== "shadowed") &&
+        (!filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter)),
+      );
+      const mcps = this.mcps.filter((mcp) =>
+        mcp.plugin?.id === plugin.id &&
+        (this.showSuperseded || mcp.effective !== "shadowed") &&
+        (!filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter)),
+      );
       const scope = plugin.scope ?? "global";
       return visibleGroupKinds({ plugins: false, skills: skills.length > 0, mcps: mcps.length > 0 })
         .map((kind) => ({
           kind: "group" as const,
-          label: kind === "skills" ? "Skills" : "MCPs",
+          label: groupLabel(kind),
           scope,
           targetPath: kind === "skills" ? join(plugin.root, "skills") : plugin.mcpPath ?? join(plugin.root, ".mcp.json"),
           groupKind: kind,
@@ -769,8 +823,8 @@ class FlatPluginsProvider implements vscode.TreeDataProvider<Node> {
     }
     if (node.kind === "group" && node.parentPlugin) {
       const filter = this.filter.toLowerCase();
-      if (node.groupKind === "skills") return this.skills.filter((skill) => skill.plugin?.id === node.parentPlugin!.id && (!filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter))).map(skillNode);
-      if (node.groupKind === "mcps") return this.mcps.filter((mcp) => mcp.plugin?.id === node.parentPlugin!.id && (!filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter))).map(mcpNode);
+      if (node.groupKind === "skills") return this.skills.filter((skill) => skill.plugin?.id === node.parentPlugin!.id && (this.showSuperseded || skill.state.effective !== "shadowed") && (!filter || `${skill.name} ${skill.skillPath}`.toLowerCase().includes(filter))).map(skillNode);
+      if (node.groupKind === "mcps") return this.mcps.filter((mcp) => mcp.plugin?.id === node.parentPlugin!.id && (this.showSuperseded || mcp.effective !== "shadowed") && (!filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter))).map(mcpNode);
     }
     if (node.kind === "mcp" && node.mcp)
       return (this.tools.get(node.mcp.id) ?? []).map((tool) => mcpToolNode(tool, node.mcp!));
@@ -786,6 +840,7 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
   readonly emitter = new vscode.EventEmitter<Node | undefined>();
   readonly onDidChangeTreeData = this.emitter.event;
   mcps: McpRecord[] = [];
+  showSuperseded = true;
   filter = "";
   private readonly expansion = new ResourceExpansionState();
   private readonly tools = new Map<string, McpTool[]>();
@@ -797,6 +852,11 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
   }
   setFilter(value: string): void {
     this.filter = value;
+    this.emitter.fire(undefined);
+  }
+  setShowSuperseded(value: boolean): void {
+    this.showSuperseded = value;
+    this.expansion.resetMaterializedNodes();
     this.emitter.fire(undefined);
   }
   setTools(mcp: McpRecord, tools: McpTool[]): void {
@@ -827,7 +887,10 @@ class FlatMcpProvider implements vscode.TreeDataProvider<Node> {
     if (!node) {
       const filter = this.filter.toLowerCase();
       return this.mcps
-        .filter((mcp) => !filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter))
+        .filter((mcp) =>
+          (this.showSuperseded || mcp.effective !== "shadowed") &&
+          (!filter || `${mcp.name} ${mcp.configPath}`.toLowerCase().includes(filter)),
+        )
         .map(mcpNode);
     }
     if (node.kind === "mcp" && node.mcp)
@@ -1282,6 +1345,19 @@ export function activate(context: vscode.ExtensionContext): void {
   command("codexPowerToys.plugins.clearFilter", () => clearFilter("Plugins", plugins));
   command("codexPowerToys.mcp.filter", () => filterCommand("MCPs", mcps));
   command("codexPowerToys.mcp.clearFilter", () => clearFilter("MCPs", mcps));
+  command("codexPowerToys.resources.toggleSuperseded", () => {
+    resources.setShowSuperseded(!resources.showSuperseded);
+    void syncExpansionContexts();
+  });
+  command("codexPowerToys.plugins.toggleSuperseded", () => {
+    plugins.setShowSuperseded(!plugins.showSuperseded);
+  });
+  command("codexPowerToys.skills.toggleSuperseded", () => {
+    skills.setShowSuperseded(!skills.showSuperseded);
+  });
+  command("codexPowerToys.mcp.toggleSuperseded", () => {
+    mcps.setShowSuperseded(!mcps.showSuperseded);
+  });
   command("codexPowerToys.resources.collapseAll", async () => {
     resources.applyExpansion("collapseAll");
     await setExpansionContext("resources", resources.shouldShowCollapse());

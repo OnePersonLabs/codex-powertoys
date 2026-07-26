@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { visibleGroupKinds } from "../src/resource-groups.js";
+import { resourceGroupLabel, visibleGroupKinds } from "../src/resource-groups.js";
 
 test("scope groups keep Plugins but omit empty MCP and Skills groups", () => {
   assert.deepEqual(
@@ -20,5 +20,19 @@ test("plugin child groups omit only empty resource groups", () => {
   assert.deepEqual(
     visibleGroupKinds({ plugins: false, mcps: true, skills: false }),
     ["mcps"],
+  );
+});
+
+test("resource group labels use the stable type glyphs", () => {
+  assert.equal(resourceGroupLabel("plugins"), "🔌 Plugins");
+  assert.equal(resourceGroupLabel("mcps"), "🧰 MCPs");
+  assert.equal(resourceGroupLabel("skills"), "💪 Skills");
+  assert.equal(resourceGroupLabel("agents"), "🤖 Agents");
+});
+
+test("group visibility can omit every empty group", () => {
+  assert.deepEqual(
+    visibleGroupKinds({ plugins: false, mcps: false, skills: false }),
+    [],
   );
 });

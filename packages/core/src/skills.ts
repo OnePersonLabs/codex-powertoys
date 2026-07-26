@@ -82,7 +82,7 @@ export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ 
       else if (record.state.global === "disabled" || record.state.workspace === "disabled") record.state.effective = "disabled";
       else if (winner && winner !== record) { record.state.effective = "shadowed"; record.state.shadowedBy = winner.skillPath; }
       else record.state.effective = "active";
-      record.state.glyph = record.state.effective === "active" ? "✅" : record.state.effective === "shadowed" ? "☑️" : record.state.workspace === "disabled" && record.state.global !== "disabled" ? "✖️" : "❌";
+      record.state.glyph = record.state.effective === "active" ? "✅" : record.state.effective === "shadowed" ? "✖️" : record.state.workspace === "disabled" && record.state.global !== "disabled" ? "✖️" : "❌";
     }
   }
   return { roots, skills: records.sort((a, b) => a.name.localeCompare(b.name) || a.skillPath.localeCompare(b.skillPath)), diagnostics };

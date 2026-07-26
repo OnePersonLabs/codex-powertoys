@@ -72,7 +72,7 @@ export async function discoverPlugins(options: DiscoveryOptions = {}): Promise<{
       if (!plugin.enabled) plugin.effective = "disabled";
       else if (winner && winner !== plugin) { plugin.effective = "shadowed"; plugin.shadowedBy = winner.id; }
       else plugin.effective = "active";
-      plugin.glyph = plugin.effective === "active" ? "✅" : plugin.effective === "shadowed" ? "☑️" : plugin.scope === "workspace" && !plugin.enabled ? "✖️" : "❌";
+      plugin.glyph = plugin.effective === "active" ? "✅" : plugin.effective === "shadowed" ? "✖️" : plugin.scope === "workspace" && !plugin.enabled ? "✖️" : "❌";
     }
   }
   return { plugins: plugins.sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root)), diagnostics };

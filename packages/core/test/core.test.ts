@@ -35,6 +35,49 @@ test("discovers plugins and disables their skills and MCPs", async () => {
   const values = await fixture(); const plugins = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); const plugin = plugins.plugins.find((item) => item.name === "plugin"); assert.ok(plugin); assert.equal(plugin.enabled, false); assert.equal(plugin.skillPaths.length, 1); assert.deepEqual(plugin.mcpNames, ["pluginServer"]); const mcps = await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(mcps.mcps.find((item) => item.name === "pluginServer")?.effective, "unavailable"); const skills = await discoverSkills({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(skills.skills.find((item) => item.sourceKind === "plugin")?.state.effective, "unavailable"); await setPluginEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, plugin, true, "global"); assert.match(await readFile(join(values.codex, "config.toml"), "utf8"), /enabled = true/); await setPluginEnabled({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }, plugin, undefined, "global"); assert.doesNotMatch(await readFile(join(values.codex, "config.toml"), "utf8"), /plugins\.\"plugin@source\"/);
 });
 
+test("disabled global MCP config overrides a same-name plugin MCP", async () => {
+  const values = await fixture();
+  const globalConfig = join(values.codex, "config.toml");
+  const existing = await readFile(globalConfig, "utf8");
+  await writeFile(globalConfig, `${existing.replace('[plugins."plugin@source"]\nenabled = false', '[plugins."plugin@source"]\nenabled = true')}\n\n[mcp_servers.pluginServer]\ncommand = "echo"\nenabled = false\n`);
+  const result = await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace });
+  const records = result.mcps.filter((record) => record.name === "pluginServer");
+  const config = records.find((record) => record.sourceKind === "config");
+  const plugin = records.find((record) => record.sourceKind === "plugin");
+  assert.equal(config?.effective, "disabled");
+  assert.equal(plugin?.effective, "shadowed");
+  assert.equal(plugin?.shadowedBy, config?.id);
+});
+
+test("workspace MCP config outranks global config even when disabled", async () => {
+  const values = await fixture();
+  const globalConfig = join(values.codex, "config.toml");
+  const workspaceConfig = join(values.workspace, ".codex", "config.toml");
+  await writeFile(globalConfig, `${await readFile(globalConfig, "utf8")}\n[mcp_servers.scopeWinner]\ncommand = "echo"\nenabled = true\n`);
+  await writeFile(workspaceConfig, `[mcp_servers.scopeWinner]\ncommand = "echo"\nenabled = false\n`);
+  const records = (await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).mcps.filter((record) => record.name === "scopeWinner");
+  const global = records.find((record) => record.scope === "global");
+  const workspace = records.find((record) => record.scope === "workspace");
+  assert.equal(workspace?.effective, "disabled");
+  assert.equal(global?.effective, "shadowed");
+  assert.equal(global?.shadowedBy, workspace?.id);
+});
+
+test("workspace plugin MCP outranks a global config MCP", async () => {
+  const values = await fixture();
+  const workspacePlugin = join(values.workspace, ".codex", "plugins", "workspace-mcp", "1.0.0");
+  await mkdir(join(workspacePlugin, ".codex-plugin"), { recursive: true });
+  await writeFile(join(workspacePlugin, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "workspace-mcp", mcpServers: "./mcp.json" }));
+  await writeFile(join(workspacePlugin, "mcp.json"), JSON.stringify({ mcpServers: { crossScope: { command: "echo" } } }));
+  await writeFile(join(values.codex, "config.toml"), `${await readFile(join(values.codex, "config.toml"), "utf8")}\n[mcp_servers.crossScope]\ncommand = "global"\n`);
+  const records = (await discoverMcps({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace })).mcps.filter((record) => record.name === "crossScope");
+  const global = records.find((record) => record.scope === "global");
+  const workspace = records.find((record) => record.scope === "workspace");
+  assert.equal(workspace?.effective, "active");
+  assert.equal(global?.effective, "shadowed");
+  assert.equal(global?.shadowedBy, workspace?.id);
+});
+
 test("requires a Codex plugin manifest and preserves declared MCP paths", async () => {
   const values = await fixture(); const result = await discoverPlugins({ homeDir: values.home, codexHome: values.codex, workspaceRoot: values.workspace }); assert.equal(result.plugins.find((item) => item.name === "remote-plugin"), undefined); assert.equal(result.plugins.find((item) => item.name === "plugin")?.mcpPath?.endsWith("plugin-mcp.json"), true);
 });

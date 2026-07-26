@@ -130,6 +130,26 @@
         "icon": "$(close)"
       },
       {
+        "command": "codexPowerToys.resources.toggleSuperseded",
+        "title": "Toggle Superseded Resources",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codexPowerToys.plugins.toggleSuperseded",
+        "title": "Toggle Superseded Plugins",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codexPowerToys.skills.toggleSuperseded",
+        "title": "Toggle Superseded Skills",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codexPowerToys.mcp.toggleSuperseded",
+        "title": "Toggle Superseded MCPs",
+        "icon": "$(eye)"
+      },
+      {
         "command": "codexPowerToys.resources.collapseAll",
         "title": "Collapse All",
         "icon": "$(collapse-all)"
@@ -324,6 +344,11 @@
           "group": "navigation"
         },
         {
+          "command": "codexPowerToys.resources.toggleSuperseded",
+          "when": "view == codexPowerToys.resources",
+          "group": "navigation"
+        },
+        {
           "command": "codexPowerToys.skills.filter",
           "when": "view == codexPowerToys.skills",
           "group": "navigation"
@@ -339,8 +364,18 @@
           "group": "navigation"
         },
         {
+          "command": "codexPowerToys.plugins.toggleSuperseded",
+          "when": "view == codexPowerToys.plugins",
+          "group": "navigation"
+        },
+        {
           "command": "codexPowerToys.skills.clearFilter",
           "when": "view == codexPowerToys.skills && codexPowerToys.skillsFilterActive",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.skills.toggleSuperseded",
+          "when": "view == codexPowerToys.skills",
           "group": "navigation"
         },
         {
@@ -351,6 +386,11 @@
         {
           "command": "codexPowerToys.mcp.clearFilter",
           "when": "view == codexPowerToys.mcps && codexPowerToys.mcpsFilterActive",
+          "group": "navigation"
+        },
+        {
+          "command": "codexPowerToys.mcp.toggleSuperseded",
+          "when": "view == codexPowerToys.mcps",
           "group": "navigation"
         },
         {

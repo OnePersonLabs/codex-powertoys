@@ -64,6 +64,13 @@ test("extension manifest registers inspector views and commands", async () => {
     "codexPowerToys.resources.expandAll",
   ])
     assert.ok(manifest.contributes.commands.some((item) => item.command === command));
+  for (const command of [
+    "codexPowerToys.resources.toggleSuperseded",
+    "codexPowerToys.plugins.toggleSuperseded",
+    "codexPowerToys.skills.toggleSuperseded",
+    "codexPowerToys.mcp.toggleSuperseded",
+  ])
+    assert.ok(manifest.contributes.commands.some((item) => item.command === command));
   assert.equal(manifest.contributes.commands.some((item) => item.command === "codexPowerToys.agents.collapseAll"), false);
   assert.match(source, /canSelectMany:\s*true/);
   assert.match(source, /createTreeView\("codexPowerToys.resources"/);
@@ -77,9 +84,13 @@ test("extension manifest registers inspector views and commands", async () => {
   assert.match(source, /🔨/);
   assert.match(source, /💪/);
   assert.match(source, /visibleGroupKinds\(/);
+  assert.match(source, /resourceGroupLabel\(/);
+  assert.match(source, /showSuperseded/);
+  assert.match(source, /effective === "shadowed"\) return "✖️"/);
   assert.match(source, /setExpansionContext/);
   assert.match(source, /copyRelativePath/);
   assert.match(source, /new ResourceDragController/);
+  assert.doesNotMatch(source, /codexPowerToys\.agents\.toggleSuperseded/);
   const command = (name: string) =>
     manifest.contributes.commands.find((item) => item.command === name);
   assert.equal(command("codexPowerToys.plugin.enable")?.enablement, "!resourceEnabled");
