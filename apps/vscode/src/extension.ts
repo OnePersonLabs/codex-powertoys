@@ -209,6 +209,7 @@ function resourcesExpansionNode(node: Node): ExpansionNode {
     id: nodeKey(node),
     root,
     skillRelated: node.kind === "skill" || Boolean(node.underSkill),
+    mcpRelated: node.kind === "mcp" || node.kind === "mcpTool" || Boolean(node.underMcp),
     initiallyExpanded: root,
   };
 }
@@ -473,7 +474,7 @@ class ResourcesProvider implements vscode.TreeDataProvider<Node> {
     const targets: Node[] = [];
     const visit = (node: Node): void => {
       if (!nodeIsExpandable(node, this.showSupporting, true)) return;
-      if (node.kind === "skill" || node.underSkill) return;
+      if (node.kind === "skill" || node.underSkill || node.kind === "mcp" || node.underMcp) return;
       targets.push(node);
       for (const child of this.getChildren(node)) visit(child);
     };
