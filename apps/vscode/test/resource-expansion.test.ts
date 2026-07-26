@@ -18,6 +18,11 @@ test("default expansion expands containers and collapses skills", () => {
   assert.equal(state.toolbarAction(), "expandAll");
 });
 
+test("default expansion collapses Resources plugin nodes", () => {
+  const state = new ResourceExpansionState();
+  assert.equal(state.register({ id: "plugin", nestedResource: true }), false);
+});
+
 test("collapse action collapses every known node", () => {
   const state = new ResourceExpansionState();
   state.register(node("group"));

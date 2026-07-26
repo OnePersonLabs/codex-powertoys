@@ -18,6 +18,8 @@ test("resource provider preserves scope and plugin source hierarchy", async () =
   assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind\)/);
   assert.match(source, /map\(\(kind\) => this\.groupNode\(scope, kind, plugin\)/);
   assert.match(source, /filteredPlugins\(node\.scope!/);
+  assert.match(source, /plugins: this\.filteredPlugins\(scope\)\.length > 0/);
+  assert.match(source, /label: groupLabel\(kind\)/);
 });
 
 test("plugin nodes identify the plugin and delegate scope-aware tooltip paths", async () => {
@@ -26,6 +28,7 @@ test("plugin nodes identify the plugin and delegate scope-aware tooltip paths", 
   assert.match(source, /item\.tooltip = pluginTooltip\(node\.plugin, workspaceRoot\(\)\)/);
   assert.match(source, /command: "codexPowerToys\.plugin\.openManifest"/);
   assert.match(source, /function pluginManifestPath\(plugin: PluginRecord\)/);
+  assert.match(source, /node\.kind === "plugin" \|\|/);
 });
 
 test("resource groups and expansion state preserve skill-specific behavior", async () => {
@@ -37,6 +40,10 @@ test("resource groups and expansion state preserve skill-specific behavior", asy
   assert.match(source, /underSkill: true/);
   assert.match(source, /tooltipPath\(path, node\.scope, workspaceRoot\(\)\)/);
   assert.match(source, /resources\.setShowSupporting\(/);
+  assert.match(source, /resources\.setShowSuperseded\(/);
+  assert.match(source, /plugins\.setShowSuperseded\(/);
+  assert.match(source, /skills\.setShowSuperseded\(/);
+  assert.match(source, /mcps\.setShowSuperseded\(/);
   assert.match(source, /if \(key === "Resources"\) void syncExpansionContexts\(\)/);
 });
 
