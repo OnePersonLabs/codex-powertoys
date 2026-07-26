@@ -2,6 +2,7 @@ export type Scope = "global" | "workspace";
 export type SourceKind = "workspace" | "user" | "plugin" | "system" | "config" | "unknown";
 export type ResourceKind = "skill" | "mcp" | "agent";
 export type EffectiveResourceState = "active" | "disabled" | "shadowed" | "unavailable";
+export type ResourceStatusGlyph = "✅" | "☑️" | "❌" | "✖️";
 export type ConflictMode = "skip" | "replace" | "decide-each";
 export type TransferOperation = "copy" | "move";
 
@@ -37,14 +38,16 @@ export interface PluginInfo {
   metadata?: Record<string, unknown>;
   effective?: EffectiveResourceState;
   shadowedBy?: string;
-  glyph?: "✅" | "☑️" | "❌" | "✖️";
+  shadowedByEnabled?: boolean;
+  glyph?: ResourceStatusGlyph;
 }
 
 export interface PluginRecord extends PluginInfo {
   id: string;
   effective: EffectiveResourceState;
   shadowedBy?: string;
-  glyph: "✅" | "☑️" | "❌" | "✖️";
+  shadowedByEnabled?: boolean;
+  glyph: ResourceStatusGlyph;
   diagnostics: Diagnostic[];
   sourceRange?: SourceRange;
   skillPaths: string[];
@@ -73,8 +76,9 @@ export interface SkillState {
   pluginEnabled: boolean;
   effective: EffectiveResourceState;
   shadowedBy?: string;
+  shadowedByEnabled?: boolean;
   disabledByPlugin?: boolean;
-  glyph: "✅" | "☑️" | "❌" | "✖️";
+  glyph: ResourceStatusGlyph;
 }
 
 export interface SkillRecord {
@@ -155,6 +159,7 @@ export interface McpRecord {
   pluginEnabled: boolean;
   effective: EffectiveResourceState;
   shadowedBy?: string;
+  shadowedByEnabled?: boolean;
   disabledByPlugin?: boolean;
   workingDirectory?: string;
   readOnly?: boolean;

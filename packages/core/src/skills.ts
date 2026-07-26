@@ -4,6 +4,7 @@ import YAML from "yaml";
 import { parseSkillOverrides, readConfig } from "./toml.js";
 import { resolveRoots } from "./paths.js";
 import { discoverPlugins } from "./plugins.js";
+import { resourceStatusGlyph } from "./status-glyph.js";
 import type { Diagnostic, DiscoveryOptions, PluginInfo, PluginRecord, RootSet, SkillMetadata, SkillRecord, SkillState, SupportingEntry } from "./types.js";
 
 async function fileExists(path: string): Promise<boolean> { try { await stat(path); return true; } catch { return false; } }
@@ -49,6 +50,12 @@ async function discoverFiles(root: string): Promise<string[]> {
 
 function scopeConfigPath(roots: RootSet, scope: "global" | "workspace"): string | undefined { return scope === "global" ? roots.globalConfigPath : roots.workspaceConfigPath; }
 
+function skillEnabled(record: SkillRecord): boolean {
+  if (!record.state.pluginEnabled) return false;
+  if (record.state.workspace === "disabled") return false;
+  return record.state.global !== "disabled" || record.state.workspace === "enabled";
+}
+
 export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ roots: RootSet; skills: SkillRecord[]; diagnostics: Diagnostic[] }> {
   const roots = await resolveRoots(options); const pluginCatalog = await discoverPlugins(options); const diagnostics: Diagnostic[] = [...roots.diagnostics, ...pluginCatalog.diagnostics]; const records: SkillRecord[] = [];
   const [globalText, workspaceText] = await Promise.all([readConfig(roots.globalConfigPath), roots.workspaceConfigPath ? readConfig(roots.workspaceConfigPath) : Promise.resolve("")]);
@@ -74,21 +81,21 @@ export async function discoverSkills(options: DiscoveryOptions = {}): Promise<{ 
   }
   const byName = new Map<string, SkillRecord[]>(); for (const record of records) (byName.get(record.name) ?? (byName.set(record.name, []), byName.get(record.name)!)).push(record);
   for (const group of byName.values()) {
-    const candidates = group.filter((record) => record.state.global !== "disabled" && record.state.workspace !== "disabled" && record.state.pluginEnabled && record.plugin?.effective !== "shadowed").sort((a, b) => precedence(a) - precedence(b) || a.skillPath.localeCompare(b.skillPath));
+    const candidates = group.filter((record) => record.plugin?.effective !== "shadowed").sort((a, b) => precedence(a) - precedence(b) || a.skillPath.localeCompare(b.skillPath));
     const winner = candidates[0];
     for (const record of group) {
       if (!record.state.pluginEnabled) record.state.effective = "unavailable";
-      else if (record.plugin?.effective === "shadowed") { record.state.effective = "shadowed"; record.state.shadowedBy = record.plugin.shadowedBy; }
-      else if (record.state.global === "disabled" || record.state.workspace === "disabled") record.state.effective = "disabled";
-      else if (winner && winner !== record) { record.state.effective = "shadowed"; record.state.shadowedBy = winner.skillPath; }
+      else if (record.plugin?.effective === "shadowed") { record.state.effective = "shadowed"; record.state.shadowedBy = record.plugin.shadowedBy; record.state.shadowedByEnabled = record.plugin.shadowedByEnabled ?? true; }
+      else if (winner && winner !== record) { record.state.effective = "shadowed"; record.state.shadowedBy = winner.skillPath; record.state.shadowedByEnabled = skillEnabled(winner); }
+      else if (!skillEnabled(record)) record.state.effective = "disabled";
       else record.state.effective = "active";
-      record.state.glyph = record.state.effective === "active" ? "✅" : record.state.effective === "shadowed" ? "✖️" : record.state.workspace === "disabled" && record.state.global !== "disabled" ? "✖️" : "❌";
+      record.state.glyph = resourceStatusGlyph(record.state.effective, record.state.shadowedByEnabled);
     }
   }
   return { roots, skills: records.sort((a, b) => a.name.localeCompare(b.name) || a.skillPath.localeCompare(b.skillPath)), diagnostics };
 }
 
-export async function setSkillEnabled(options: DiscoveryOptions, skillPath: string, scope: "global" | "workspace", enabled: boolean) {
+export async function setSkillEnabled(options: DiscoveryOptions, skillPath: string, scope: "global" | "workspace", enabled: boolean | undefined) {
   const roots = await resolveRoots(options); const path = scopeConfigPath(roots, scope); if (!path) throw new Error("Workspace scope requires an open workspace");
   const { setSkillOverride } = await import("./toml.js"); return setSkillOverride(path, skillPath, enabled);
 }

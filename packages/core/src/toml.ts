@@ -167,12 +167,12 @@ export function parseMcpSections(text: string, configPath: string, scope: Scope)
 
 function linesOf(text: string): string[] { return text.split(/\r?\n/); }
 
-export async function setSkillOverride(configPath: string, skillPath: string, enabled: boolean): Promise<ConfigMutationResult> {
+export async function setSkillOverride(configPath: string, skillPath: string, enabled: boolean | undefined): Promise<ConfigMutationResult> {
   const original = await readConfig(configPath);
   const lines = linesOf(original);
   const sections = parseSections(original);
   const section = sections.find((candidate) => candidate.path.join(".") === "skills.config" && candidate.values.path === skillPath);
-  if (enabled) {
+  if (enabled === undefined) {
     if (!section) return { path: configPath, changed: false };
     const next = lines.slice(section.startLine, section.endLine + 1).filter((line) => !/^\s*enabled\s*=/.test(line));
     const onlyPath = next.filter((line) => line.trim() && !line.trim().startsWith("#") && !/^\s*\[/.test(line)).length <= 1;
@@ -180,12 +180,13 @@ export async function setSkillOverride(configPath: string, skillPath: string, en
     lines.splice(section.startLine, section.endLine - section.startLine + 1, ...replacement);
   } else if (section) {
     const block = lines.slice(section.startLine, section.endLine + 1);
-    if (!block.some((line) => /^\s*enabled\s*=/.test(line))) block.splice(1, 0, "enabled = false");
-    else for (let index = 0; index < block.length; index++) if (/^\s*enabled\s*=/.test(block[index]!)) block[index] = "enabled = false";
+    const enabledIndex = block.findIndex((line) => /^\s*enabled\s*=/.test(line));
+    if (enabledIndex < 0) block.splice(1, 0, `enabled = ${enabled}`);
+    else block[enabledIndex] = `enabled = ${enabled}`;
     lines.splice(section.startLine, section.endLine - section.startLine + 1, ...block);
   } else {
     const prefix = original && !original.endsWith("\n") ? "\n" : "";
-    lines.push(`${prefix}[[skills.config]]`, `path = ${JSON.stringify(skillPath)}`, "enabled = false");
+    lines.push(`${prefix}[[skills.config]]`, `path = ${JSON.stringify(skillPath)}`, `enabled = ${enabled}`);
   }
   const nextText = lines.join("\n");
   if (nextText === original) return { path: configPath, changed: false };

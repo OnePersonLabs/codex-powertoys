@@ -2,6 +2,7 @@ import { access, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parseMcpToolPolicy, parsePluginOverrides, readConfig, setPluginOverride } from "./toml.js";
 import { resolveRoots } from "./paths.js";
+import { resourceStatusGlyph } from "./status-glyph.js";
 import type { Diagnostic, DiscoveryOptions, McpRecord, PluginInfo, PluginRecord, Scope, SourceRange } from "./types.js";
 
 interface PluginRootCandidate { path: string; scope: Scope; source: string; manifestPath: string; }
@@ -55,24 +56,24 @@ export async function discoverPlugins(options: DiscoveryOptions = {}): Promise<{
     const manifestResult = await readJson(candidate.manifestPath); const metadata = manifestResult.value ?? {}; const pluginDiagnostics: Diagnostic[] = [];
     if (manifestResult.diagnostic) { diagnostics.push(manifestResult.diagnostic); pluginDiagnostics.push(manifestResult.diagnostic); }
     const fallbackName = basename(dirname(candidate.path)); const name = stringValue(metadata.name) ?? fallbackName; const version = stringValue(metadata.version) ?? basename(candidate.path); const id = canonicalManifestPath;
-    const keyOverride = matchingOverride(candidate.scope === "workspace" ? workspaceOverrides : [...workspaceOverrides, ...globalOverrides], name, candidate.source) ?? matchingOverride(globalOverrides, name, candidate.source);
-    const effectiveOverride = candidate.scope === "workspace" ? matchingOverride(workspaceOverrides, name, candidate.source) ?? matchingOverride(globalOverrides, name, candidate.source) : matchingOverride(globalOverrides, name, candidate.source);
+    const effectiveOverride = candidate.scope === "workspace"
+      ? matchingOverride(workspaceOverrides, name, candidate.source)
+      : matchingOverride(globalOverrides, name, candidate.source);
     const configPath = effectiveOverride?.configPath; const configKey = effectiveOverride?.key; const enabled = effectiveOverride?.enabled !== false;
     const declaredSkills = stringValues(metadata.skills); const skillRoots = declaredSkills.length ? declaredSkills.map((value) => resolve(candidate.path, value)) : [join(candidate.path, "skills")]; const skillPaths: string[] = []; for (const skillsRoot of skillRoots) { if (declaredSkills.length && !(await exists(skillsRoot))) pluginDiagnostics.push({ code: "PLUGIN_SKILLS_MISSING", message: `Declared plugin skills directory is missing: ${skillsRoot}`, path: skillsRoot, severity: "warning" }); skillPaths.push(...await skillFiles(skillsRoot)); }
     const declaredMcp = stringValue(metadata.mcpServers); const mcpCandidate = declaredMcp ? resolve(candidate.path, declaredMcp) : join(candidate.path, ".mcp.json"); const mcpPath = (await exists(mcpCandidate)) ? mcpCandidate : undefined; if (declaredMcp && !mcpPath) pluginDiagnostics.push({ code: "PLUGIN_MCP_MISSING", message: `Declared plugin MCP file is missing: ${mcpCandidate}`, path: mcpCandidate, severity: "warning" }); const mcpResult = await readJson(mcpPath); if (mcpResult.diagnostic) { diagnostics.push(mcpResult.diagnostic); pluginDiagnostics.push(mcpResult.diagnostic); } const mcpServers = mcpResult.value?.mcpServers; const mcpNames = mcpServers && typeof mcpServers === "object" ? Object.keys(mcpServers as Record<string, unknown>) : [];
     const info: PluginInfo = { id, name, version, root: candidate.path, scope: candidate.scope, source: candidate.source, enabled, configPath, configKey, manifestPath: candidate.manifestPath, mcpPath, readOnly: true, metadata };
-    plugins.push({ ...info, id, effective: enabled ? "active" : "disabled", glyph: enabled ? "✅" : "❌", diagnostics: pluginDiagnostics, sourceRange: effectiveOverride?.range, skillPaths, mcpNames });
-    void keyOverride;
+    plugins.push({ ...info, id, effective: enabled ? "active" : "disabled", glyph: resourceStatusGlyph(enabled ? "active" : "disabled"), diagnostics: pluginDiagnostics, sourceRange: effectiveOverride?.range, skillPaths, mcpNames });
   }
   const byName = new Map<string, PluginRecord[]>();
   for (const plugin of plugins) (byName.get(plugin.name) ?? (byName.set(plugin.name, []), byName.get(plugin.name)!)).push(plugin);
   for (const group of byName.values()) {
-    const winner = group.filter((plugin) => plugin.enabled).sort((a, b) => (a.scope === "workspace" ? 0 : 1) - (b.scope === "workspace" ? 0 : 1) || a.root.localeCompare(b.root))[0];
+    const winner = group.sort((a, b) => (a.scope === "workspace" ? 0 : 1) - (b.scope === "workspace" ? 0 : 1) || a.root.localeCompare(b.root))[0];
     for (const plugin of group) {
-      if (!plugin.enabled) plugin.effective = "disabled";
-      else if (winner && winner !== plugin) { plugin.effective = "shadowed"; plugin.shadowedBy = winner.id; }
+      if (winner && winner !== plugin) { plugin.effective = "shadowed"; plugin.shadowedBy = winner.id; plugin.shadowedByEnabled = winner.enabled; }
+      else if (!plugin.enabled) plugin.effective = "disabled";
       else plugin.effective = "active";
-      plugin.glyph = plugin.effective === "active" ? "✅" : plugin.effective === "shadowed" ? "✖️" : plugin.scope === "workspace" && !plugin.enabled ? "✖️" : "❌";
+      plugin.glyph = resourceStatusGlyph(plugin.effective, plugin.shadowedByEnabled);
     }
   }
   return { plugins: plugins.sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root)), diagnostics };

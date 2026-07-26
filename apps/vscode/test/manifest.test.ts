@@ -86,7 +86,7 @@ test("extension manifest registers inspector views and commands", async () => {
   assert.match(source, /visibleGroupKinds\(/);
   assert.match(source, /resourceGroupLabel\(/);
   assert.match(source, /showSuperseded/);
-  assert.match(source, /effective === "shadowed"\) return "✖️"/);
+  assert.match(source, /resourceStatusGlyph\(effective, shadowedByEnabled\)/);
   assert.match(source, /setExpansionContext/);
   assert.match(source, /copyRelativePath/);
   assert.match(source, /new ResourceDragController/);
